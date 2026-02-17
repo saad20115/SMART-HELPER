@@ -25,41 +25,45 @@ const branches = [
 async function main() {
     console.log('Connecting to database...');
 
-    // Find the first company
-    const company = await prisma.company.findFirst();
+    // Find all companies
+    const companies = await prisma.company.findMany();
 
-    if (!company) {
-        console.error('No company found in the database. Please create a company first.');
+    if (companies.length === 0) {
+        console.error('No companies found in the database.');
         return;
     }
 
-    console.log(`Found company: ${company.name} (${company.id})`);
+    console.log(`Found ${companies.length} companies. Adding branches to all of them.`);
 
-    for (const branchName of branches) {
-        try {
-            // Check if branch exists
-            const existingBranch = await prisma.branch.findUnique({
-                where: {
-                    companyId_name: {
-                        companyId: company.id,
-                        name: branchName,
-                    },
-                },
-            });
+    for (const company of companies) {
+        console.log(`Processing company: ${company.name} (${company.id})`);
 
-            if (existingBranch) {
-                console.log(`Branch "${branchName}" already exists.`);
-            } else {
-                await prisma.branch.create({
-                    data: {
-                        companyId: company.id,
-                        name: branchName,
+        for (const branchName of branches) {
+            try {
+                // Check if branch exists for this company
+                const existingBranch = await prisma.branch.findUnique({
+                    where: {
+                        companyId_name: {
+                            companyId: company.id,
+                            name: branchName,
+                        },
                     },
                 });
-                console.log(`Added branch: "${branchName}"`);
+
+                if (existingBranch) {
+                    // console.log(`  Branch "${branchName}" already exists.`);
+                } else {
+                    await prisma.branch.create({
+                        data: {
+                            companyId: company.id,
+                            name: branchName,
+                        },
+                    });
+                    console.log(`  Added branch: "${branchName}" to ${company.name}`);
+                }
+            } catch (error) {
+                console.error(`  Error adding branch "${branchName}" to ${company.name}:`, error);
             }
-        } catch (error) {
-            console.error(`Error adding branch "${branchName}":`, error);
         }
     }
 }
