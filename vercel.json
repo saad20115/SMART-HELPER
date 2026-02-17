@@ -1,40 +1,17 @@
 {
     "version": 2,
-    "builds": [
-        {
-            "src": "server/api/index.js",
-            "use": "@vercel/node",
-            "config": {
-                "includeFiles": [
-                    "server/dist/**",
-                    "server/node_modules/.prisma/**",
-                    "server/node_modules/@prisma/**",
-                    "server/prisma/**",
-                    "server/dist/src/**",
-                    "server/dist/api/**"
-                ]
-            }
-        },
-        {
-            "src": "client/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
+    "installCommand": "cd client && npm install && cd ../server && npm install && npx prisma generate && npx nest build",
+    "buildCommand": "cd client && npm run build",
+    "outputDirectory": "client/dist",
+    "functions": {
+        "server/api/index.js": {
+            "includeFiles": "server/dist/**,server/node_modules/.prisma/**,server/node_modules/@prisma/**"
         }
-    ],
-    "routes": [
+    },
+    "rewrites": [
         {
-            "src": "/api/(.*)",
-            "dest": "/server/api/index.js"
-        },
-        {
-            "src": "/(.*\\.[a-zA-Z0-9]+)$",
-            "dest": "/client/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/client/index.html"
+            "source": "/api/(.*)",
+            "destination": "/server/api/index.js"
         }
     ]
 }
