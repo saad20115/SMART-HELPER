@@ -1,0 +1,247 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  HR
+  ACCOUNTANT
+}
+
+enum TerminationType {
+  RESIGNATION
+  TERMINATION
+  CONTRACT_END
+}
+
+enum DeductionType {
+  LOAN
+  PENALTY
+  ADVANCE
+  OTHER
+  VACATION_EOS_BALANCE
+}
+
+enum ImportStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum LeaveTransactionType {
+  ACCRUAL
+  USAGE
+  ADJUSTMENT
+  ENCASHMENT
+}
+
+enum FileFormat {
+  XLSX
+  CSV
+  PDF
+  JSON
+}
+
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  crNumber  String   @unique
+  email     String
+  phone     String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+
+  users           User[]
+  employees       Employee[]
+  importLogs      ImportLog[]
+  exportLogs      ExportLog[]
+  branches        Branch[]
+  jobs            Job[]
+  classifications Classification[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  companyId    String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+}
+
+model Branch {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model Job {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model Classification {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model Employee {
+  id              String           @id @default(uuid())
+  companyId       String
+  branch          String?          // Added Branch field
+  employeeNumber  String
+  fullName        String
+  nationalId      String
+  jobTitle        String
+  basicSalary     Decimal
+  housingAllowance Decimal
+  transportAllowance Decimal
+  otherAllowances Decimal
+  totalSalary     Decimal
+  hireDate        DateTime
+  endDate         DateTime?
+  terminationType TerminationType?
+  status          String           @default("active") // Added Status field
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  department      String?          // Added Department field
+  classification  String?          // Added Classification field
+
+  company         Company             @relation(fields: [companyId], references: [id])
+  leaveBalances   LeaveBalance[]
+  leaveTransactions LeaveTransaction[]
+  deductions      Deduction[]
+  eosCalculations EosCalculation[]
+
+  @@unique([companyId, nationalId])
+  @@unique([companyId, employeeNumber])
+}
+
+model LeaveBalance {
+  id                      String   @id @default(uuid())
+  employeeId              String
+  annualEntitledDays      Decimal
+  annualUsedDays          Decimal
+  calculatedRemainingDays Decimal
+  leaveValue              Decimal
+  lastCalculatedAt        DateTime @default(now())
+
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTransactions LeaveTransaction[]
+}
+
+model LeaveTransaction {
+  id             String               @id @default(uuid())
+  employeeId     String
+  leaveBalanceId String?
+  type           LeaveTransactionType
+  days           Decimal              // Positive for addition, negative for deduction
+  reason         String?
+  performedBy    String?              // User ID (HR)
+  createdAt      DateTime             @default(now())
+
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveBalance LeaveBalance? @relation(fields: [leaveBalanceId], references: [id])
+}
+
+enum DeductionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Deduction {
+  id          String        @id @default(uuid())
+  employeeId  String
+  type        DeductionType
+  amount      Decimal
+  date        DateTime      @default(now()) // Added date field
+  status      DeductionStatus @default(PENDING) // Added status field
+  description String?
+  notes       String?       // Added notes field
+  createdAt   DateTime      @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model EosCalculation {
+  id               String   @id @default(uuid())
+  employeeId       String
+  serviceYears     Decimal
+  grossEosAmount   Decimal
+  leaveCompensation Decimal
+  totalDeductions  Decimal
+  netPayable       Decimal
+  calculatedAt     DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model ImportLog {
+  id          String       @id @default(uuid())
+  companyId   String
+  fileName    String
+  totalRows   Int
+  successRows Int
+  failedRows  Int
+  status      ImportStatus
+  createdBy   String
+  createdAt   DateTime     @default(now())
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  importErrors ImportError[]
+}
+
+model ImportError {
+  id           String @id @default(uuid())
+  importLogId  String
+  rowNumber    Int
+  fieldName    String?
+  errorMessage String
+
+  importLog ImportLog @relation(fields: [importLogId], references: [id])
+}
+
+model ExportLog {
+  id          String     @id @default(uuid())
+  companyId   String
+  exportType  String
+  fileFormat  FileFormat
+  generatedBy String
+  createdAt   DateTime   @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+}

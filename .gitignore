@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.npm/
+.yarn/
+
+# Build
+dist/
+build/
+.next/
+out/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Database (Prisma / SQLite)
+/server/prisma/*.db
+/server/prisma/*.db-journal
+/server/prisma/dev.db
+
+# Others
+.vercel
+.cache/
+.turbo/
