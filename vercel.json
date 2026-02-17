@@ -2,8 +2,16 @@
     "version": 2,
     "builds": [
         {
-            "src": "server/api/index.ts",
-            "use": "@vercel/node"
+            "src": "server/api/index.js",
+            "use": "@vercel/node",
+            "config": {
+                "includeFiles": [
+                    "server/dist/**",
+                    "server/node_modules/.prisma/**",
+                    "server/node_modules/@prisma/**",
+                    "server/prisma/**"
+                ]
+            }
         },
         {
             "src": "client/package.json",
@@ -16,10 +24,10 @@
     "routes": [
         {
             "src": "/api/(.*)",
-            "dest": "/server/api/index.ts"
+            "dest": "/server/api/index.js"
         },
         {
-            "src": "/(.*\\..*)",
+            "src": "/(.*\\.[a-zA-Z0-9]+)$",
             "dest": "/client/$1"
         },
         {

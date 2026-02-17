@@ -21,7 +21,8 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && nest build",
+    "vercel-build": "prisma generate && nest build"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -37,7 +38,8 @@
     "pdfkit": "^0.17.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "@nestjs/cli": "^11.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

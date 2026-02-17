@@ -1,10 +1,14 @@
-import 'reflect-metadata';
-import 'dotenv/config';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
-import { AllExceptionsFilter } from '../src/common/filters/http-exception.filter';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 
-let appPromise: Promise<any>;
+// Import reflect-metadata before anything else - required for NestJS decorators
+require("reflect-metadata");
+require("dotenv/config");
+
+const { NestFactory } = require("@nestjs/core");
+const { AppModule } = require("../dist/app.module");
+
+let appPromise;
 
 async function bootstrap() {
     try {
@@ -14,7 +18,6 @@ async function bootstrap() {
             origin: '*',
             credentials: true,
         });
-        app.useGlobalFilters(new AllExceptionsFilter());
         await app.init();
         return app.getHttpAdapter().getInstance();
     } catch (error) {
@@ -23,7 +26,7 @@ async function bootstrap() {
     }
 }
 
-export default async function handler(req: any, res: any) {
+module.exports = async function handler(req, res) {
     try {
         if (!appPromise) {
             appPromise = bootstrap();
@@ -32,10 +35,11 @@ export default async function handler(req: any, res: any) {
         return app(req, res);
     } catch (error) {
         console.error('Handler error:', error);
+        appPromise = null;
         res.status(500).json({
             statusCode: 500,
             message: 'Internal server error',
             error: error instanceof Error ? error.message : 'Unknown error',
         });
     }
-}
+};
