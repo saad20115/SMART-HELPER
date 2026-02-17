@@ -9,7 +9,9 @@
                     "server/dist/**",
                     "server/node_modules/.prisma/**",
                     "server/node_modules/@prisma/**",
-                    "server/prisma/**"
+                    "server/prisma/**",
+                    "server/dist/src/**",
+                    "server/dist/api/**"
                 ]
             }
         },
