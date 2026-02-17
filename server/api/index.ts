@@ -1,5 +1,7 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
+import { AllExceptionsFilter } from '../src/common/filters/http-exception.filter';
 
 let appPromise: Promise<any>;
 
@@ -10,6 +12,7 @@ async function bootstrap() {
         origin: '*',
         credentials: true,
     });
+    app.useGlobalFilters(new AllExceptionsFilter());
     await app.init();
     return app.getHttpAdapter().getInstance();
 }
