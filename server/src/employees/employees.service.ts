@@ -89,20 +89,24 @@ export class EmployeesService {
       },
     });
 
-    if (!employee) return null;
+    if (!employee) throw new NotFoundException('Employee not found');
     return this.enrichWithVacationBalance(employee);
   }
 
   async update(id: string, updateEmployeeDto: Partial<CreateEmployeeDto>) {
+    console.log('[UPDATE] Step 1: Finding employee', id);
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id },
     });
     if (!currentEmployee) throw new NotFoundException('Employee not found');
+    console.log('[UPDATE] Step 2: Employee found, preparing data');
 
-    // Sanitize input
+    // Sanitize input: remove non-Prisma fields
     const {
       vacationBalance: _vacationBalance,
       endServiceReason: _endServiceReason,
+      companyId: newCompanyId,
+      totalSalary: _totalSalary,
       ...prismaUpdateData
     } = updateEmployeeDto;
 
@@ -140,6 +144,11 @@ export class EmployeesService {
       status: prismaUpdateData.status,
     };
 
+    // Allow updating the company
+    if (newCompanyId) {
+      data.company = { connect: { id: newCompanyId } };
+    }
+
     if (prismaUpdateData.hireDate) {
       data.hireDate = new Date(prismaUpdateData.hireDate);
     }
@@ -147,11 +156,13 @@ export class EmployeesService {
       data.endDate = new Date(prismaUpdateData.endDate);
     }
 
+    console.log('[UPDATE] Step 3: Calling prisma.employee.update', JSON.stringify(data));
     const updatedEmployee = await this.prisma.employee.update({
       where: { id },
       data,
       include: { leaveBalances: true, leaveTransactions: true },
     });
+    console.log('[UPDATE] Step 4: Update complete, enriching');
 
     return this.enrichWithVacationBalance(updatedEmployee);
   }

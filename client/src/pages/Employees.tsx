@@ -35,6 +35,7 @@ const Employees: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [filterCompanyId, setFilterCompanyId] = useState('');
 
     // Form State
     const [formData, setFormData] = useState({
@@ -99,6 +100,26 @@ const Employees: React.FC = () => {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Reload branches/jobs/classifications when company changes in the form
+    useEffect(() => {
+        if (!showAddForm || !formData.companyId) return;
+        const loadCompanySettings = async () => {
+            try {
+                const [branchData, jobData, classData] = await Promise.all([
+                    settingsApi.getBranches(formData.companyId),
+                    settingsApi.getJobs(formData.companyId),
+                    settingsApi.getClassifications(formData.companyId),
+                ]);
+                setBranches(branchData);
+                setJobs(jobData);
+                setClassifications(classData);
+            } catch (err) {
+                console.error('Error loading company settings:', err);
+            }
+        };
+        loadCompanySettings();
+    }, [formData.companyId, showAddForm]);
 
     const handleInputChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -261,12 +282,19 @@ const Employees: React.FC = () => {
         }
     };
 
-    const filteredEmployees = employees.filter(
-        (emp) =>
+    const getCompanyName = (companyId: string) => {
+        const company = companies.find((c) => c.id === companyId);
+        return company ? company.name : companyId;
+    };
+
+    const filteredEmployees = employees.filter((emp) => {
+        const matchesSearch =
             emp.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             emp.employeeNumber.includes(searchTerm) ||
-            emp.nationalId.includes(searchTerm),
-    );
+            emp.nationalId.includes(searchTerm);
+        const matchesCompany = !filterCompanyId || emp.companyId === filterCompanyId;
+        return matchesSearch && matchesCompany;
+    });
 
     if (loading && employees.length === 0) {
         return (
@@ -438,25 +466,30 @@ const Employees: React.FC = () => {
                     <select
                         title="اختر الشركة لتصفية الموظفين"
                         style={{ minWidth: '160px' }}
+                        value={filterCompanyId}
+                        onChange={(e) => setFilterCompanyId(e.target.value)}
                     >
-                        <option>كل الشركات</option>
+                        <option value="">كل الشركات</option>
                         {companies.map((c) => (
                             <option key={c.id} value={c.id}>
                                 {c.name}
                             </option>
                         ))}
                     </select>
-                    <button
-                        className="btn"
-                        style={{
-                            backgroundColor: '#fff',
-                            border: '1px solid #E9ECEF',
-                            color: '#495057',
-                        }}
-                    >
-                        <Filter size={18} />
-                        <span>تصفية</span>
-                    </button>
+                    {filterCompanyId && (
+                        <button
+                            className="btn"
+                            style={{
+                                backgroundColor: '#fff',
+                                border: '1px solid #DC3545',
+                                color: '#DC3545',
+                            }}
+                            onClick={() => setFilterCompanyId('')}
+                        >
+                            <Filter size={18} />
+                            <span>إزالة الفلتر</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -785,6 +818,16 @@ const Employees: React.FC = () => {
                                         color: '#495057',
                                     }}
                                 >
+                                    الشركة
+                                </th>
+                                <th
+                                    style={{
+                                        padding: '20px',
+                                        textAlign: 'right',
+                                        fontWeight: '700',
+                                        color: '#495057',
+                                    }}
+                                >
                                     الوظيفة / الفرع
                                 </th>
                                 <th
@@ -889,6 +932,20 @@ const Employees: React.FC = () => {
                                         </td>
                                         <td style={{ padding: '20px', color: '#495057' }}>
                                             {emp.employeeNumber}
+                                        </td>
+                                        <td style={{ padding: '20px', color: '#495057' }}>
+                                            <span
+                                                style={{
+                                                    padding: '4px 10px',
+                                                    borderRadius: '8px',
+                                                    backgroundColor: '#E3F2FD',
+                                                    color: '#1565C0',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '600',
+                                                }}
+                                            >
+                                                {getCompanyName(emp.companyId)}
+                                            </span>
                                         </td>
                                         <td style={{ padding: '20px' }}>
                                             <div
@@ -1008,7 +1065,7 @@ const Employees: React.FC = () => {
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={8}
+                                        colSpan={9}
                                         style={{
                                             padding: '40px',
                                             textAlign: 'center',

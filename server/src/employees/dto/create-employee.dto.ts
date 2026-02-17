@@ -72,4 +72,8 @@ export class CreateEmployeeDto {
     @IsOptional()
     @IsNumber()
     vacationBalance?: number;
+
+    @IsOptional()
+    @IsNumber()
+    totalSalary?: number;
 }

@@ -23,6 +23,7 @@ export class EmployeesController {
 
     @Put(':id')
     update(@Param('id') id: string, @Body() updateEmployeeDto: Partial<CreateEmployeeDto>) {
+        console.log('[DEBUG] PUT /employees/' + id, JSON.stringify(updateEmployeeDto));
         return this.employeesService.update(id, updateEmployeeDto);
     }
 
