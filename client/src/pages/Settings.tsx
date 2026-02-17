@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { User, Bell, Shield, Globe, Save, Briefcase, Plus, Edit2, Trash2, X } from 'lucide-react';
 import './Settings.css';
 import { companiesApi, settingsApi } from '../api/settingsService';
 import type { Company, Branch, Job, Classification } from '../api/settingsService';
 
 const Settings = () => {
+    const location = useLocation();
+
     const [activeTab, setActiveTab] = useState('profile');
     const [orgActiveTab, setOrgActiveTab] = useState('companies');
     const [loading, setLoading] = useState(false);
@@ -23,6 +26,17 @@ const Settings = () => {
     const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
     const [currentItem, setCurrentItem] = useState<any>(null);
     const [modalInput, setModalInput] = useState('');
+
+    useEffect(() => {
+        if (location.state) {
+            if (location.state.activeTab) {
+                setActiveTab(location.state.activeTab);
+            }
+            if (location.state.orgActiveTab) {
+                setOrgActiveTab(location.state.orgActiveTab);
+            }
+        }
+    }, [location]);
 
     const loadCompanies = useCallback(async () => {
         try {

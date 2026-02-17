@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { Prisma } from '@prisma/client';
@@ -12,22 +12,28 @@ export class EmployeesService {
   ) { }
 
   async create(createEmployeeDto: CreateEmployeeDto) {
-    const { vacationBalance: _vacationBalance, endServiceReason: _endServiceReason, ...prismaData } = createEmployeeDto;
+    const {
+      vacationBalance: _vacationBalance,
+      endServiceReason: _endServiceReason,
+      ...prismaData
+    } = createEmployeeDto;
 
     const totalSalary =
-      Number(prismaData.basicSalary) +
-      Number(prismaData.housingAllowance) +
-      Number(prismaData.transportAllowance) +
-      Number(prismaData.otherAllowances);
+      Number(prismaData.basicSalary || 0) +
+      Number(prismaData.housingAllowance || 0) +
+      Number(prismaData.transportAllowance || 0) +
+      Number(prismaData.otherAllowances || 0);
 
     const employee = await this.prisma.employee.create({
       data: {
         ...prismaData,
-        totalSalary,
+        basicSalary: Number(prismaData.basicSalary || 0),
+        housingAllowance: Number(prismaData.housingAllowance || 0),
+        transportAllowance: Number(prismaData.transportAllowance || 0),
+        otherAllowances: Number(prismaData.otherAllowances || 0),
+        totalSalary: totalSalary,
         hireDate: new Date(prismaData.hireDate),
-        endDate: prismaData.endDate
-          ? new Date(prismaData.endDate)
-          : null,
+        endDate: prismaData.endDate ? new Date(prismaData.endDate) : null,
       },
       include: { leaveBalances: true },
     });
@@ -43,8 +49,7 @@ export class EmployeesService {
           annualEntitledDays: 21,
           annualUsedDays: 0,
           calculatedRemainingDays: Number(createEmployeeDto.vacationBalance),
-          leaveValue:
-            Number(createEmployeeDto.vacationBalance) * (totalSalary / 30),
+          leaveValue: Number(createEmployeeDto.vacationBalance) * (totalSalary / 30),
         },
       });
 
@@ -92,13 +97,15 @@ export class EmployeesService {
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id },
     });
-    if (!currentEmployee) throw new Error('Employee not found');
+    if (!currentEmployee) throw new NotFoundException('Employee not found');
 
-    // Sanitize input: remove non-model fields
-    const { vacationBalance: _vacationBalance, endServiceReason: _endServiceReason, companyId: _companyId, ...prismaUpdateData } = updateEmployeeDto;
-    const data: Prisma.EmployeeUpdateInput = { ...prismaUpdateData } as any;
+    // Sanitize input
+    const {
+      vacationBalance: _vacationBalance,
+      endServiceReason: _endServiceReason,
+      ...prismaUpdateData
+    } = updateEmployeeDto;
 
-    // Recalculate total salary if any component changes
     const basicSalary =
       updateEmployeeDto.basicSalary ?? Number(currentEmployee.basicSalary);
     const housingAllowance =
@@ -111,14 +118,34 @@ export class EmployeesService {
       updateEmployeeDto.otherAllowances ??
       Number(currentEmployee.otherAllowances);
 
-    data.totalSalary =
-      Number(basicSalary) + Number(housingAllowance) + Number(transportAllowance) + Number(otherAllowances);
+    const totalSalary =
+      Number(basicSalary) +
+      Number(housingAllowance) +
+      Number(transportAllowance) +
+      Number(otherAllowances);
 
-    if (updateEmployeeDto.hireDate)
-      data.hireDate = new Date(updateEmployeeDto.hireDate);
-    if (updateEmployeeDto.endDate)
-      data.endDate = new Date(updateEmployeeDto.endDate);
-    if (updateEmployeeDto.status) data.status = updateEmployeeDto.status;
+    const data: Prisma.EmployeeUpdateInput = {
+      fullName: prismaUpdateData.fullName,
+      employeeNumber: prismaUpdateData.employeeNumber,
+      nationalId: prismaUpdateData.nationalId,
+      jobTitle: prismaUpdateData.jobTitle,
+      branch: prismaUpdateData.branch,
+      department: prismaUpdateData.department,
+      classification: prismaUpdateData.classification,
+      basicSalary: Number(basicSalary),
+      housingAllowance: Number(housingAllowance),
+      transportAllowance: Number(transportAllowance),
+      otherAllowances: Number(otherAllowances),
+      totalSalary: totalSalary,
+      status: prismaUpdateData.status,
+    };
+
+    if (prismaUpdateData.hireDate) {
+      data.hireDate = new Date(prismaUpdateData.hireDate);
+    }
+    if (prismaUpdateData.endDate) {
+      data.endDate = new Date(prismaUpdateData.endDate);
+    }
 
     const updatedEmployee = await this.prisma.employee.update({
       where: { id },
@@ -134,6 +161,7 @@ export class EmployeesService {
   }
 
   private enrichWithVacationBalance(employee: any) {
+    if (!employee) return null;
     const balanceData = this.leaveService.calculateCurrentBalance(employee);
 
     return {

@@ -8,6 +8,7 @@ import Reports from './pages/Reports';
 import LeaveManagement from './pages/LeaveManagement';
 import Settings from './pages/Settings';
 import PendingAmounts from './pages/PendingAmounts';
+import BackupRestore from './pages/BackupRestore';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="leave-management" element={<LeaveManagement />} />
           <Route path="settings" element={<Settings />} />
           <Route path="pending-amounts" element={<PendingAmounts />} />
+          <Route path="backup-restore" element={<BackupRestore />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -84,6 +84,7 @@ async function main() {
         }
     ];
 
+    /*
     for (const emp of employeesData) {
         // Check if employee exists by nationalId to avoid duplicates
         const existingEmp = await prisma.employee.findFirst({
@@ -99,6 +100,7 @@ async function main() {
             console.log(`Employee already exists: ${emp.fullName}`);
         }
     }
+    */
 
     console.log('Seeding finished.');
 }

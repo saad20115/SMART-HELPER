@@ -195,31 +195,43 @@ export const employeesApi = {
 };
 
 // Dashboard API
+export interface SalaryChart {
+    basicSalary: number;
+    housingAllowance: number;
+    transportAllowance: number;
+    otherAllowances: number;
+}
+
 export interface DashboardStats {
     totalEmployees: number;
     companiesCount: number;
     branchesCount: number;
+    jobsCount: number;
+    classificationsCount: number;
     totalSalaries: number;
     eosLiability: string;
+    salaryChart: SalaryChart;
 }
 
 export interface Activity {
-    id: number;
-    type: 'SALARY' | 'EOS' | 'INFO';
+    id: string;
+    type: 'DEDUCTION' | 'LEAVE';
     title: string;
     time: string;
     amount: string;
-    status: 'SUCCESS' | 'INFO' | 'ERROR';
+    status: 'SUCCESS' | 'WARNING' | 'INFO';
 }
 
 export const dashboardApi = {
-    getStats: async (): Promise<DashboardStats> => {
-        const response = await apiClient.get('/dashboard/stats');
+    getStats: async (companyId?: string): Promise<DashboardStats> => {
+        const params = companyId ? { companyId } : {};
+        const response = await apiClient.get('/dashboard/stats', { params });
         return response.data;
     },
 
-    getActivity: async (): Promise<Activity[]> => {
-        const response = await apiClient.get('/dashboard/activity');
+    getActivity: async (companyId?: string): Promise<Activity[]> => {
+        const params = companyId ? { companyId } : {};
+        const response = await apiClient.get('/dashboard/activity', { params });
         return response.data;
     },
 };
@@ -303,5 +315,46 @@ export const deductionsApi = {
 
     delete: async (id: string): Promise<void> => {
         await apiClient.delete(`/deductions/${id}`);
+    }
+};
+
+export interface BackupFile {
+    filename: string;
+    size: number;
+    createdAt: string;
+}
+
+export const backupApi = {
+    getBackups: async (): Promise<BackupFile[]> => {
+        const response = await apiClient.get('/backup');
+        return response.data;
+    },
+
+    createBackup: async (): Promise<BackupFile> => {
+        const response = await apiClient.post('/backup');
+        return response.data;
+    },
+
+    restoreBackup: async (filename: string): Promise<void> => {
+        await apiClient.post(`/backup/restore/${filename}`);
+    },
+
+    deleteBackup: async (filename: string): Promise<void> => {
+        await apiClient.delete(`/backup/${filename}`);
+    },
+
+    uploadBackup: async (file: File): Promise<any> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post('/backup/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    getDownloadUrl: (filename: string) => {
+        return `${apiClient.defaults.baseURL}/backup/${filename}/download`;
     }
 };

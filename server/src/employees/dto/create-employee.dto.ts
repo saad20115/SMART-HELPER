@@ -1,4 +1,4 @@
-import { IsString, IsDecimal, IsDateString, IsEnum, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsDecimal, IsDateString, IsEnum, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
 // import { TerminationType } from '@prisma/client';
 
 export enum TerminationType {
@@ -12,12 +12,15 @@ export class CreateEmployeeDto {
     companyId: string;
 
     @IsString()
+    @IsNotEmpty()
     employeeNumber: string;
 
     @IsString()
+    @IsNotEmpty()
     fullName: string;
 
     @IsString()
+    @IsNotEmpty()
     nationalId: string;
 
     @IsString()

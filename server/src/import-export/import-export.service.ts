@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FileFormat, ImportStatus } from '@prisma/client';
+import { FileFormat, ImportStatus, Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { CreateEmployeeDto } from '../employees/dto/create-employee.dto';
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
+import { parse, isValid } from 'date-fns';
 
 export interface ImportSummary {
   totalRows: number;
@@ -16,6 +17,8 @@ export interface ImportSummary {
 
 @Injectable()
 export class ImportExportService {
+  private readonly logger = new Logger(ImportExportService.name);
+
   constructor(private prisma: PrismaService) { }
 
   async importEmployees(
@@ -31,239 +34,241 @@ export class ImportExportService {
       throw new Error('Company ID is required');
     }
 
-    // Parse the Excel/CSV file carefully
+    this.logger.log(`Starting import for company ${companyId}, file: ${file.originalname}`);
+
+    // Parse the Excel/CSV file
     let data: any[] = [];
     try {
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      data = XLSX.utils.sheet_to_json(worksheet);
+      data = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      // Filter out completely empty rows
+      data = data.filter((row) => {
+        return Object.values(row).some(
+          (val) =>
+            val !== null &&
+            val !== undefined &&
+            String(val).trim() !== '' &&
+            String(val) !== '[object Object]',
+        );
+      });
+      this.logger.log(`Parsed ${data.length} data rows from file`);
     } catch (error) {
-      console.error('Error parsing file:', error);
-      throw new Error(
-        'Failed to parse file. Please ensure it is a valid Excel or CSV file.',
-      );
+      this.logger.error('Error parsing file:', error);
+      throw new Error('Failed to parse file. Please ensure it is a valid Excel or CSV file.');
     }
 
     // Create import log
-    let importLog;
-    try {
-      importLog = await this.prisma.importLog.create({
-        data: {
-          companyId,
-          fileName: file.originalname,
-          totalRows: data.length,
-          successRows: 0,
-          failedRows: 0,
-          status: ImportStatus.PROCESSING,
-          createdBy: userId || 'system', // Fallback if userId is missing
-        },
-      });
-    } catch (error) {
-      console.error('Error creating import log:', error);
-      // Check for Prisma initialization error or connection error
-      if (
-        error.code === 'P1001' ||
-        error.message.includes("Can't reach database server")
-      ) {
-        throw new Error('Database connection failed. Please try again later.');
-      }
-      throw new Error(
-        'Failed to start import process. Database error: ' +
-        (error.message || 'Unknown'),
-      );
-    }
+    const importLog = await this.prisma.importLog.create({
+      data: {
+        companyId,
+        fileName: file.originalname,
+        totalRows: data.length,
+        successRows: 0,
+        failedRows: 0,
+        status: ImportStatus.PROCESSING,
+        createdBy: userId || 'system',
+      },
+    });
 
+    const finalErrors: Array<{ row: number; field?: string; message: string }> = [];
+    const importErrorsToCreate: Prisma.ImportErrorCreateManyInput[] = [];
     let successCount = 0;
     let failedCount = 0;
-    const errors: Array<{ row: number; field?: string; message: string }> = [];
 
     try {
-      // Process each row
+      // 1. Prepare and Validate Data in Batches
+      const batchSize = 500;
+      const readyToInsertEmployees: Prisma.EmployeeCreateManyInput[] = [];
+      const employeeDataMap = new Map<string, any>();
 
-      // Process each row
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i];
-        const rowNumber = i + 2; // Excel rows start at 1, plus header row
+      // Pre-fetch all IDs to check duplicates efficiently
+      const nationalIdsToCheck = data
+        .map((row) => String(row['رقم الهوية'] || row['National ID'] || '').trim())
+        .filter((id) => id !== '');
+      const empNumsToCheck = data
+        .map((row) => String(row['رقم الموظف'] || row['Employee Number'] || '').trim())
+        .filter((num) => num !== '');
 
-        try {
-          // Map Excel columns to DTO fields
-          const employeeData: CreateEmployeeDto = plainToClass(
-            CreateEmployeeDto,
-            {
-              companyId,
-              employeeNumber: String(
-                row['رقم الموظف'] || row['Employee Number'] || '',
-              ),
-              fullName: row['الاسم الكامل'] || row['Full Name'] || '',
-              nationalId: String(row['رقم الهوية'] || row['National ID'] || ''),
-              jobTitle: row['المسمى الوظيفي'] || row['Job Title'] || '',
-              branch: row['الفرع'] || row['Branch'],
-              basicSalary: parseFloat(
-                row['الراتب الأساسي'] || row['Basic Salary'] || '0',
-              ),
-              housingAllowance: parseFloat(
-                row['بدل السكن'] || row['Housing Allowance'] || '0',
-              ),
-              transportAllowance: parseFloat(
-                row['بدل النقل'] || row['Transport Allowance'] || '0',
-              ),
-              otherAllowances: parseFloat(
-                row['بدلات أخرى'] || row['Other Allowances'] || '0',
-              ),
-              hireDate: this.parseDate(
-                row['تاريخ التعيين'] || row['Hire Date'],
-              ),
-              endDate: this.parseDate(row['تاريخ الانتهاء'] || row['End Date']),
-              terminationType: row['نوع الانتهاء'] || row['Termination Type'],
-              vacationBalance: parseFloat(
-                row['رصيد الإجازات'] ||
-                row['Vacation Balance'] ||
-                row['رصيد الاجازات'] ||
-                '0',
-              ),
-            },
-          );
+      const existingNationalIds = new Set<string>();
+      const existingEmpNums = new Set<string>();
 
-          // Validate the data
-          const validationErrors = await validate(employeeData);
+      if (nationalIdsToCheck.length > 0 || empNumsToCheck.length > 0) {
+        const existing = await this.prisma.employee.findMany({
+          where: {
+            companyId,
+            OR: [
+              { nationalId: { in: nationalIdsToCheck } },
+              { employeeNumber: { in: empNumsToCheck } },
+            ],
+          },
+          select: { nationalId: true, employeeNumber: true },
+        });
+        existing.forEach((e) => {
+          if (e.nationalId) existingNationalIds.add(e.nationalId);
+          if (e.employeeNumber) existingEmpNums.add(e.employeeNumber);
+        });
+      }
+
+      for (let i = 0; i < data.length; i += batchSize) {
+        const batch = data.slice(i, i + batchSize);
+        this.logger.log(`Processing batch ${i / batchSize + 1} (${batch.length} rows)`);
+
+        for (let j = 0; j < batch.length; j++) {
+          const row = batch[j];
+          const rowNumber = i + j + 2;
+
+          // Mapping
+          const rawEmpData = {
+            companyId,
+            employeeNumber: String(row['رقم الموظف'] || row['Employee Number'] || '').trim(),
+            fullName: String(row['الاسم الكامل'] || row['Full Name'] || '').trim(),
+            nationalId: String(row['رقم الهوية'] || row['National ID'] || '').trim(),
+            jobTitle: String(row['المسمى الوظيفي'] || row['Job Title'] || '').trim(),
+            branch: row['الفرع'] || row['Branch'],
+            basicSalary: parseFloat(String(row['الراتب الأساسي'] || row['Basic Salary'] || '0')),
+            housingAllowance: parseFloat(String(row['بدل السكن'] || row['Housing Allowance'] || '0')),
+            transportAllowance: parseFloat(String(row['بدل النقل'] || row['Transport Allowance'] || '0')),
+            otherAllowances: parseFloat(String(row['بدلات أخرى'] || row['Other Allowances'] || '0')),
+            hireDate: this.parseDate(row['تاريخ التعيين'] || row['Hire Date']),
+            endDate: (row['تاريخ الانتهاء'] || row['End Date']) ? this.parseDate(row['تاريخ الانتهاء'] || row['End Date']) : null,
+            terminationType: row['نوع الانتهاء'] || row['Termination Type'],
+            vacationBalance: parseFloat(String(row['رصيد الإجازات'] || row['Vacation Balance'] || row['رصيد الاجازات'] || '0')),
+            status: 'active',
+          };
+
+          // Basic Validation (avoiding slow class-validator for every single row if possible, but keeping it for completeness)
+          const empDto = plainToClass(CreateEmployeeDto, rawEmpData);
+          const validationErrors = await validate(empDto);
+
           if (validationErrors.length > 0) {
-            const errorMessages = validationErrors
-              .map((err) => Object.values(err.constraints || {}).join(', '))
-              .join('; ');
-
-            errors.push({
-              row: rowNumber,
-              message: errorMessages,
-            });
-
-            await this.prisma.importError.create({
-              data: {
-                importLogId: importLog.id,
-                rowNumber,
-                errorMessage: errorMessages,
-              },
-            });
-
+            const msg = validationErrors.map((err) => Object.values(err.constraints || {}).join(', ')).join('; ');
+            finalErrors.push({ row: rowNumber, message: msg });
+            importErrorsToCreate.push({ importLogId: importLog.id, rowNumber, errorMessage: msg });
             failedCount++;
             continue;
           }
 
-          // Check for duplicates only on non-empty fields
-          const duplicateFilters: any[] = [];
-          if (
-            employeeData.nationalId &&
-            employeeData.nationalId.trim() !== ''
-          ) {
-            duplicateFilters.push({ nationalId: employeeData.nationalId });
-          }
-          if (
-            employeeData.employeeNumber &&
-            employeeData.employeeNumber.trim() !== ''
-          ) {
-            duplicateFilters.push({
-              employeeNumber: employeeData.employeeNumber,
-            });
+          // Duplicate Check
+          if (existingNationalIds.has(rawEmpData.nationalId) || existingEmpNums.has(rawEmpData.employeeNumber)) {
+            const msg = 'موظف موجود مسبقاً / Duplicate employee';
+            finalErrors.push({ row: rowNumber, message: msg });
+            importErrorsToCreate.push({ importLogId: importLog.id, rowNumber, errorMessage: msg });
+            failedCount++;
+            continue;
           }
 
-          if (duplicateFilters.length > 0) {
-            const existing = await this.prisma.employee.findFirst({
-              where: {
-                companyId,
-                OR: duplicateFilters,
-              },
-            });
-
-            if (existing) {
-              errors.push({
-                row: rowNumber,
-                message: `موظف موجود مسبقاً برقم الهوية أو رقم الموظف / Employee already exists with this National ID or Employee Number`,
-              });
-
-              await this.prisma.importError.create({
-                data: {
-                  importLogId: importLog.id,
-                  rowNumber,
-                  errorMessage: 'Duplicate employee',
-                },
-              });
-
-              failedCount++;
-              continue;
-            }
+          if (!rawEmpData.hireDate) {
+            const msg = 'تاريخ التعيين غير صالح / Invalid hire date';
+            finalErrors.push({ row: rowNumber, message: msg });
+            importErrorsToCreate.push({ importLogId: importLog.id, rowNumber, errorMessage: msg });
+            failedCount++;
+            continue;
           }
 
-          const totalSalary =
-            Number(employeeData.basicSalary || 0) +
-            Number(employeeData.housingAllowance || 0) +
-            Number(employeeData.transportAllowance || 0) +
-            Number(employeeData.otherAllowances || 0);
+          const totalSalary = rawEmpData.basicSalary + rawEmpData.housingAllowance + rawEmpData.transportAllowance + rawEmpData.otherAllowances;
 
-          const employee = await this.prisma.employee.create({
-            data: {
-              ...employeeData,
-              totalSalary,
-              hireDate: new Date(employeeData.hireDate),
-              endDate: employeeData.endDate
-                ? new Date(employeeData.endDate)
-                : null,
-            },
+          readyToInsertEmployees.push({
+            companyId: rawEmpData.companyId,
+            employeeNumber: rawEmpData.employeeNumber,
+            fullName: rawEmpData.fullName,
+            nationalId: rawEmpData.nationalId,
+            jobTitle: rawEmpData.jobTitle,
+            branch: rawEmpData.branch,
+            basicSalary: rawEmpData.basicSalary,
+            housingAllowance: rawEmpData.housingAllowance,
+            transportAllowance: rawEmpData.transportAllowance,
+            otherAllowances: rawEmpData.otherAllowances,
+            totalSalary: totalSalary,
+            hireDate: new Date(rawEmpData.hireDate),
+            endDate: rawEmpData.endDate ? new Date(rawEmpData.endDate) : null,
+            status: 'active',
           });
 
-          if (
-            employeeData.vacationBalance !== undefined &&
-            Number(employeeData.vacationBalance) !== 0
-          ) {
-            const balance = await this.prisma.leaveBalance.create({
-              data: {
-                employeeId: employee.id,
-                annualEntitledDays: 21,
-                annualUsedDays: 0,
-                calculatedRemainingDays: Number(employeeData.vacationBalance),
-                leaveValue:
-                  Number(employeeData.vacationBalance) * (totalSalary / 30),
-              },
-            });
-
-            await this.prisma.leaveTransaction.create({
-              data: {
-                employeeId: employee.id,
-                leaveBalanceId: balance.id,
-                type: 'ADJUSTMENT',
-                days: Number(employeeData.vacationBalance),
-                reason: 'رصيد ابتدائي عند الاستيراد',
-                performedBy: 'system',
-              },
-            });
+          if (rawEmpData.vacationBalance !== 0) {
+            employeeDataMap.set(rawEmpData.employeeNumber, rawEmpData);
           }
+        }
 
-          successCount++;
-        } catch (error) {
-          errors.push({
-            row: rowNumber,
-            message: error.message || 'خطأ غير معروف / Unknown error',
-          });
-
-          await this.prisma.importError.create({
-            data: {
-              importLogId: importLog.id,
-              rowNumber,
-              errorMessage: error.message || 'Unknown error',
-            },
-          });
-
-          failedCount++;
+        // Insert errors in batches too
+        if (importErrorsToCreate.length >= 100) {
+          await this.prisma.importError.createMany({ data: importErrorsToCreate.splice(0, importErrorsToCreate.length) });
         }
       }
+
+      // Final write for remaining errors
+      if (importErrorsToCreate.length > 0) {
+        await this.prisma.importError.createMany({ data: importErrorsToCreate });
+      }
+
+      // 4. Bulk Insert Employees in Chunks
+      if (readyToInsertEmployees.length > 0) {
+        this.logger.log(`Inserting ${readyToInsertEmployees.length} employees...`);
+        for (let i = 0; i < readyToInsertEmployees.length; i += batchSize) {
+          const chunk = readyToInsertEmployees.slice(i, i + batchSize);
+          await this.prisma.employee.createMany({ data: chunk, skipDuplicates: true });
+        }
+
+        // 5. Build related records
+        const empNums = Array.from(employeeDataMap.keys());
+        const createdEmployees = await this.prisma.employee.findMany({
+          where: { companyId, employeeNumber: { in: empNums } },
+          select: { id: true, employeeNumber: true, totalSalary: true },
+        });
+
+        const balancesToInsert: Prisma.LeaveBalanceCreateManyInput[] = [];
+        for (const emp of createdEmployees) {
+          const rowData = employeeDataMap.get(emp.employeeNumber);
+          if (rowData) {
+            const vBalance = rowData.vacationBalance;
+            const tSalary = Number(emp.totalSalary);
+            const lValue = vBalance * (tSalary / 30);
+
+            balancesToInsert.push({
+              employeeId: emp.id,
+              annualEntitledDays: 21,
+              annualUsedDays: 0,
+              calculatedRemainingDays: vBalance,
+              leaveValue: lValue,
+            });
+          }
+        }
+
+        if (balancesToInsert.length > 0) {
+          this.logger.log(`Inserting ${balancesToInsert.length} leave balances...`);
+          for (let i = 0; i < balancesToInsert.length; i += batchSize) {
+            const chunk = balancesToInsert.slice(i, i + batchSize);
+            await this.prisma.leaveBalance.createMany({ data: chunk });
+          }
+
+          const createdBalances = await this.prisma.leaveBalance.findMany({
+            where: { employeeId: { in: createdEmployees.map((e) => e.id) } },
+            select: { id: true, employeeId: true, calculatedRemainingDays: true },
+          });
+
+          const transactions: Prisma.LeaveTransactionCreateManyInput[] = createdBalances.map((b) => ({
+            employeeId: b.employeeId,
+            leaveBalanceId: b.id,
+            type: 'ADJUSTMENT',
+            days: b.calculatedRemainingDays,
+            reason: 'رصيد ابتدائي عند الاستيراد',
+            performedBy: 'system',
+          }));
+
+          for (let i = 0; i < transactions.length; i += batchSize) {
+            const chunk = transactions.slice(i, i + batchSize);
+            await this.prisma.leaveTransaction.createMany({ data: chunk });
+          }
+        }
+        successCount = createdEmployees.length;
+      }
     } catch (error) {
-      // If a catastrophic error occurs (like DB connection loss), mark log as FAILED
+      this.logger.error('Critical error during import:', error);
       await this.prisma.importLog.update({
         where: { id: importLog.id },
-        data: {
-          status: ImportStatus.FAILED,
-          failedRows: data.length, // Assume all failed if we crashed
-          successRows: 0,
-        },
+        data: { status: ImportStatus.FAILED, failedRows: data.length, successRows: 0 },
       });
       throw error;
     }
@@ -274,10 +279,7 @@ export class ImportExportService {
       data: {
         successRows: successCount,
         failedRows: failedCount,
-        status:
-          failedCount === data.length
-            ? ImportStatus.FAILED
-            : ImportStatus.COMPLETED,
+        status: failedCount === data.length ? ImportStatus.FAILED : ImportStatus.COMPLETED,
       },
     });
 
@@ -286,7 +288,7 @@ export class ImportExportService {
       successRows: successCount,
       failedRows: failedCount,
       importLogId: importLog.id,
-      errors,
+      errors: finalErrors,
     };
   }
 
@@ -296,7 +298,6 @@ export class ImportExportService {
     userId: string,
     filters?: { branch?: string; jobTitle?: string },
   ): Promise<Buffer> {
-    // Query employees with optional filters
     const employees = await this.prisma.employee.findMany({
       where: {
         companyId,
@@ -306,7 +307,6 @@ export class ImportExportService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Create export log
     await this.prisma.exportLog.create({
       data: {
         companyId,
@@ -316,7 +316,6 @@ export class ImportExportService {
       },
     });
 
-    // Transform data for export
     const exportData = employees.map((emp) => ({
       'رقم الموظف': emp.employeeNumber,
       'الاسم الكامل': emp.fullName,
@@ -329,9 +328,7 @@ export class ImportExportService {
       'بدلات أخرى': emp.otherAllowances.toString(),
       'إجمالي الراتب': emp.totalSalary.toString(),
       'تاريخ التعيين': emp.hireDate.toISOString().split('T')[0],
-      'تاريخ الانتهاء': emp.endDate
-        ? emp.endDate.toISOString().split('T')[0]
-        : '',
+      'تاريخ الانتهاء': emp.endDate ? emp.endDate.toISOString().split('T')[0] : '',
       'نوع الانتهاء': emp.terminationType || '',
     }));
 
@@ -342,18 +339,16 @@ export class ImportExportService {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Employees');
 
-      const buffer = XLSX.write(workbook, {
+      return XLSX.write(workbook, {
         type: 'buffer',
         bookType: format === FileFormat.CSV ? 'csv' : 'xlsx',
-      });
-
-      return buffer;
+      }) as Buffer;
     }
 
     throw new Error('Unsupported format');
   }
 
-  async getImportLogs(companyId: string, skip: number = 0, take: number = 10) {
+  async getImportLogs(companyId: string, skip = 0, take = 10) {
     return this.prisma.importLog.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
@@ -361,13 +356,13 @@ export class ImportExportService {
       take,
       include: {
         importErrors: {
-          take: 5, // Preview first 5 errors
+          take: 5,
         },
       },
     });
   }
 
-  async getExportLogs(companyId: string, skip: number = 0, take: number = 10) {
+  async getExportLogs(companyId: string, skip = 0, take = 10) {
     return this.prisma.exportLog.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
@@ -393,11 +388,9 @@ export class ImportExportService {
     const worksheet = XLSX.utils.aoa_to_sheet([headers]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
-
-    // Set column widths for better readability
     worksheet['!cols'] = headers.map(() => ({ wch: 20 }));
 
-    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 
   async getImportErrors(importLogId: string) {
@@ -406,85 +399,66 @@ export class ImportExportService {
       orderBy: { rowNumber: 'asc' },
     });
   }
+
   private parseDate(value: any): string | undefined {
     if (!value) return undefined;
 
-    // Handle Excel serial number
     if (typeof value === 'number') {
-      const date = XLSX.SSF.parse_date_code(value);
-      return new Date(date.y, date.m - 1, date.d).toISOString();
+      try {
+        const date = XLSX.SSF.parse_date_code(value);
+        const jsDate = new Date(date.y, date.m - 1, date.d);
+        if (!isNaN(jsDate.getTime())) {
+          return jsDate.toISOString();
+        }
+      } catch (e) {
+        console.warn('Failed to parse Excel date code:', value);
+      }
     }
 
-    // Handle string formats
     if (typeof value === 'string') {
-      const trimmedValue = value.trim();
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
 
-      // Check for DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY format
-      // Also supports MM/DD/YYYY if the first part is > 12
-      // Regex captures: 1=PartA, 2=PartB, 3=Year
-      const dateMatch = trimmedValue.match(
-        /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/,
-      );
-      if (dateMatch) {
-        const partA = parseInt(dateMatch[1]);
-        const partB = parseInt(dateMatch[2]);
-        const year = parseInt(dateMatch[3]);
-
-        let day, month;
-
-        // Assumption: DD/MM/YYYY is standard.
-        // However, if PartA > 12, it must be day (so PartB is month).
-        // If PartB > 12, it must be day (so PartA is month), but standard ISO is MM/DD/YYYY?
-        // Let's try to be smart.
-
-        if (partB > 12 && partA <= 12) {
-          // Clearly MM/DD/YYYY (e.g. 02/15/2026)
-          month = partA - 1;
-          day = partB;
-        } else {
-          // Default to DD/MM/YYYY (e.g. 15/02/2026)
-          // Or if both <= 12, ambiguous, assume DD/MM/YYYY (common in region)
-          day = partA;
-          month = partB - 1;
-        }
-
-        // Validate month
-        if (month < 0 || month > 11) {
-          // Try swapping if we didn't already
-          if (partA <= 12 && partB > 12) {
-            // already handled above
-          } else if (partA > 12 && partB <= 12) {
-            // already handled above (standard DD/MM)
-          } else if (partA <= 12 && partB <= 12) {
-            // Ambiguous, try swapping to see if it makes sense?
-            // No, if both are <= 12, standard assumption applies.
-          }
-          // If still invalid, maybe just fail?
-        }
-
-        // Construct date
-        const date = new Date(year, month, day);
-
-        // Validate that the date components match (handles 31/02/2026 -> March 3rd etc if we want to be strict)
-        // But Date object auto-corrects. Let's just return strict ISO.
-        // Actually, let's just use the Date object but format manually to avoid timezone issues 100%
-
-        // Re-verify strictly?
-        if (
-          date.getFullYear() === year &&
-          date.getMonth() === month &&
-          date.getDate() === day
-        ) {
-          const mm = (month + 1).toString().padStart(2, '0');
-          const dd = day.toString().padStart(2, '0');
-          return `${year}-${mm}-${dd}T00:00:00.000Z`;
-        }
+      // Fast path for ISO-like strings
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+        const d = new Date(trimmed);
+        if (!isNaN(d.getTime())) return d.toISOString();
       }
 
-      // Try standard Date parse as fallback (handles YYYY-MM-DD, etc.)
-      const date = new Date(trimmedValue);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
+      const formats = [
+        'dd/MM/yyyy',
+        'dd-MM-yyyy',
+        'dd.MM.yyyy',
+        'yyyy/MM/dd',
+        'yyyy-MM-dd',
+        'MM/dd/yyyy',
+        'd/M/yyyy',
+        'M/d/yyyy',
+      ];
+
+      for (const fmt of formats) {
+        try {
+          const parsedDate = parse(trimmed, fmt, new Date());
+          if (isValid(parsedDate)) {
+            if (parsedDate.getFullYear() > 1900) {
+              return parsedDate.toISOString();
+            }
+          }
+        } catch (e) { }
+      }
+
+      const normalized = trimmed.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString());
+      if (normalized !== trimmed) {
+        for (const fmt of formats) {
+          try {
+            const parsedDate = parse(normalized, fmt, new Date());
+            if (isValid(parsedDate)) {
+              if (parsedDate.getFullYear() > 1900) {
+                return parsedDate.toISOString();
+              }
+            }
+          } catch (e) { }
+        }
       }
     }
 

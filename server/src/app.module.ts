@@ -10,6 +10,7 @@ import { SettingsModule } from './settings/settings.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { LeaveModule } from './leave/leave.module';
 import { DeductionsModule } from './deductions/deductions.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DeductionsModule } from './deductions/deductions.module';
     ImportExportModule,
     LeaveModule,
     DeductionsModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [AppService],

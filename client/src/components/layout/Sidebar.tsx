@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Users, Calculator, Settings, LogOut, FileText, Calendar, DollarSign } from 'lucide-react';
+import { Home, Users, Calculator, Settings, LogOut, FileText, Calendar, DollarSign, Database } from 'lucide-react';
 
 
 const Sidebar: React.FC = () => {
@@ -13,6 +13,7 @@ const Sidebar: React.FC = () => {
         { icon: DollarSign, label: 'المبالغ المعلقة', path: '/pending-amounts' },
         { icon: FileText, label: 'التقارير', path: '/reports' },
         { icon: Settings, label: 'الإعدادات', path: '/settings' },
+        { icon: Database, label: 'النسخ الاحتياطي', path: '/backup-restore' },
     ];
 
     return (
