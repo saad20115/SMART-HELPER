@@ -3,11 +3,6 @@
     "installCommand": "cd client && npm install && cd ../server && npm install && npx prisma generate && npx nest build",
     "buildCommand": "cd client && npm run build",
     "outputDirectory": "client/dist",
-    "functions": {
-        "api/index.js": {
-            "includeFiles": "server/**"
-        }
-    },
     "rewrites": [
         {
             "source": "/api/(.*)",
