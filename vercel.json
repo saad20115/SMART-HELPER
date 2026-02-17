@@ -4,14 +4,14 @@
     "buildCommand": "cd client && npm run build",
     "outputDirectory": "client/dist",
     "functions": {
-        "server/api/index.js": {
-            "includeFiles": "server/dist/**,server/node_modules/.prisma/**,server/node_modules/@prisma/**"
+        "api/index.js": {
+            "includeFiles": "server/**"
         }
     },
     "rewrites": [
         {
             "source": "/api/(.*)",
-            "destination": "/server/api/index.js"
+            "destination": "/api/index.js"
         }
     ]
 }
