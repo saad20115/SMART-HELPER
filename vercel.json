@@ -1,12 +1,4 @@
 {
-    "version": 2,
-    "installCommand": "cd client && npm install && cd ../server && npm install && npx prisma generate && npx nest build",
-    "buildCommand": "cd client && npm run build",
-    "outputDirectory": "client/dist",
-    "rewrites": [
-        {
-            "source": "/api/(.*)",
-            "destination": "/api/index.js"
-        }
-    ]
+    "buildCommand": "cd client && npm install && npm run build",
+    "outputDirectory": "client/dist"
 }
