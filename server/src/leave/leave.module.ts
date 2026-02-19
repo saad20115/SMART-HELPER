@@ -4,9 +4,9 @@ import { LeaveController } from './leave.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [LeaveController],
-    providers: [LeaveService],
-    exports: [LeaveService],
+  imports: [PrismaModule],
+  controllers: [LeaveController],
+  providers: [LeaveService],
+  exports: [LeaveService],
 })
-export class LeaveModule { }
+export class LeaveModule {}

@@ -4,115 +4,214 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class DashboardService {
-    constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) { }
 
-    async getStats(companyId?: string) {
-        const employeeWhere: Prisma.EmployeeWhereInput = companyId ? { companyId } : {};
+  async getStats(companyId?: string) {
+    const employeeWhere: Prisma.EmployeeWhereInput = companyId
+      ? { companyId }
+      : {};
 
-        const totalEmployees = await this.prisma.employee.count({ where: employeeWhere });
-        const companiesCount = await this.prisma.company.count();
+    const totalEmployees = await this.prisma.employee.count({
+      where: employeeWhere,
+    });
+    const companiesCount = await this.prisma.company.count();
 
-        // Branches from settings (Branch table)
-        const branchWhere: Prisma.BranchWhereInput = companyId ? { companyId } : {};
-        const branchesCount = await this.prisma.branch.count({ where: branchWhere });
+    // Branches from settings (Branch table)
+    const branchWhere: Prisma.BranchWhereInput = companyId ? { companyId } : {};
+    const branchesCount = await this.prisma.branch.count({
+      where: branchWhere,
+    });
 
-        // Jobs from settings
-        const jobWhere: Prisma.JobWhereInput = companyId ? { companyId } : {};
-        const jobsCount = await this.prisma.job.count({ where: jobWhere });
+    // Jobs from settings
+    const jobWhere: Prisma.JobWhereInput = companyId ? { companyId } : {};
+    const jobsCount = await this.prisma.job.count({ where: jobWhere });
 
-        // Classifications from settings
-        const classWhere: Prisma.ClassificationWhereInput = companyId ? { companyId } : {};
-        const classificationsCount = await this.prisma.classification.count({ where: classWhere });
+    // Classifications from settings
+    const classWhere: Prisma.ClassificationWhereInput = companyId
+      ? { companyId }
+      : {};
+    const classificationsCount = await this.prisma.classification.count({
+      where: classWhere,
+    });
 
-        // Salary and EOS calculations
-        const employees = await this.prisma.employee.findMany({
-            where: employeeWhere,
-            select: { totalSalary: true, basicSalary: true, housingAllowance: true, transportAllowance: true, otherAllowances: true, hireDate: true },
-        });
+    // Salary and EOS calculations
+    const employees = await this.prisma.employee.findMany({
+      where: employeeWhere,
+      select: {
+        totalSalary: true,
+        basicSalary: true,
+        housingAllowance: true,
+        transportAllowance: true,
+        otherAllowances: true,
+        hireDate: true,
+      },
+    });
 
-        const totalSalaries = employees.reduce((sum, emp) => sum + Number(emp.totalSalary || 0), 0);
+    const totalSalaries = employees.reduce(
+      (sum, emp) => sum + Number(emp.totalSalary || 0),
+      0,
+    );
 
-        // EOS Liability approximation
-        const eosLiabilityVal = employees.reduce((sum, emp) => {
-            const years = (new Date().getTime() - new Date(emp.hireDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-            const basic = Number(emp.basicSalary || 0);
-            if (years <= 5) return sum + (years * 0.5 * basic);
-            return sum + (5 * 0.5 * basic) + ((years - 5) * basic);
-        }, 0);
+    // EOS Liability and Leave Compensation Calculation
+    let eosLiabilityVal = 0;
+    let totalLeaveCompensation = 0;
 
-        // Salary breakdown for chart
-        const chartData = {
-            basicSalary: employees.reduce((s, e) => s + Number(e.basicSalary || 0), 0),
-            housingAllowance: employees.reduce((s, e) => s + Number(e.housingAllowance || 0), 0),
-            transportAllowance: employees.reduce((s, e) => s + Number(e.transportAllowance || 0), 0),
-            otherAllowances: employees.reduce((s, e) => s + Number(e.otherAllowances || 0), 0),
-        };
+    for (const emp of employees) {
+      // --- EOS Calculation (Same logic as EosCalculationService) ---
+      const hireDate = new Date(emp.hireDate);
+      if (isNaN(hireDate.getTime())) continue;
 
-        return {
-            totalEmployees,
-            companiesCount,
-            branchesCount,
-            jobsCount,
-            classificationsCount,
-            totalSalaries,
-            eosLiability: eosLiabilityVal.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }),
-            salaryChart: chartData,
-        };
+      const endDate = new Date(); // Assume current liability if they resigned today
+      const durationInMs = endDate.getTime() - hireDate.getTime();
+      const serviceYears = durationInMs / (1000 * 60 * 60 * 24 * 365.25);
+
+      const basicSalary = Number(emp.basicSalary || 0);
+
+      // validation
+      if (isNaN(basicSalary) || isNaN(serviceYears)) continue;
+
+      // Gross EOS (Half salary first 5 years, Full thereafter)
+      let grossEOS = 0;
+      if (serviceYears <= 5) {
+        grossEOS = serviceYears * 0.5 * basicSalary;
+      } else {
+        grossEOS = 5 * 0.5 * basicSalary + (serviceYears - 5) * basicSalary;
+      }
+
+      // Net EOS (Assume Resignation logic for liability)
+      let entitlementRatio = 1.0;
+      if (serviceYears < 2) {
+        entitlementRatio = 0; // No entitlement if less than 2 years resignation
+      } else if (serviceYears < 5) {
+        entitlementRatio = 1 / 3;
+      } else if (serviceYears < 10) {
+        entitlementRatio = 2 / 3;
+      } else {
+        entitlementRatio = 1.0;
+      }
+
+      const liability = grossEOS * entitlementRatio;
+      if (!isNaN(liability)) {
+        eosLiabilityVal += liability;
+      }
+
+      // --- Leave Compensation Calculation ---
+      // We need to fetch the balance or approximate it. 
+      // Ideally, we should join 'leaveBalances' in the query above.
+      // But since we didn't include it in 'findMany', let's assume valid data or fetch it.
+      // For dashboard performance, fetching all balances might be heavy? 
+      // Let's optimize by including it in the initial query.
     }
 
-    async getRecentActivity(companyId?: string) {
-        const employeeFilter = companyId
-            ? { employee: { companyId } }
-            : {};
+    // Re-query with leaveBalances to get accurate leave liability
+    const employeesWithLeave = await this.prisma.employee.findMany({
+      where: employeeWhere,
+      select: {
+        totalSalary: true,
+        leaveBalances: {
+          select: { calculatedRemainingDays: true }
+        }
+      }
+    });
 
-        const recentDeductions = await this.prisma.deduction.findMany({
-            where: employeeFilter,
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: { employee: { select: { fullName: true } } },
-        });
+    totalLeaveCompensation = employeesWithLeave.reduce((sum, emp) => {
+      const balance = emp.leaveBalances[0]?.calculatedRemainingDays || 0;
+      if (balance > 0) {
+        const dailyWage = Number(emp.totalSalary || 0) / 30;
+        return sum + (balance * dailyWage);
+      }
+      return sum;
+    }, 0);
 
-        const recentLeaves = await this.prisma.leaveTransaction.findMany({
-            where: employeeFilter,
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: { employee: { select: { fullName: true } } },
-        });
+    // Salary breakdown for chart
+    const chartData = {
+      basicSalary: employees.reduce(
+        (s, e) => s + Number(e.basicSalary || 0),
+        0,
+      ),
+      housingAllowance: employees.reduce(
+        (s, e) => s + Number(e.housingAllowance || 0),
+        0,
+      ),
+      transportAllowance: employees.reduce(
+        (s, e) => s + Number(e.transportAllowance || 0),
+        0,
+      ),
+      otherAllowances: employees.reduce(
+        (s, e) => s + Number(e.otherAllowances || 0),
+        0,
+      ),
+    };
 
-        const deductionLabels: Record<string, string> = {
-            LOAN: '\u0633\u0644\u0641\u0629',
-            PENALTY: '\u062c\u0632\u0627\u0621',
-            ADVANCE: '\u062f\u0641\u0639\u0629 \u0645\u0642\u062f\u0645\u0629',
-            OTHER: '\u0623\u062e\u0631\u0649',
-            VACATION_EOS_BALANCE: '\u0631\u0635\u064a\u062f \u0625\u062c\u0627\u0632\u0627\u062a/\u0646\u0647\u0627\u064a\u0629 \u062e\u062f\u0645\u0629',
-        };
+    return {
+      totalEmployees,
+      companiesCount,
+      branchesCount,
+      jobsCount,
+      classificationsCount,
+      totalSalaries,
+      eosLiability: eosLiabilityVal, // Return number, format on frontend
+      totalLeaveCompensation: totalLeaveCompensation,
+      salaryChart: chartData,
+    };
+  }
 
-        const leaveLabels: Record<string, string> = {
-            ACCRUAL: '\u0627\u0633\u062a\u062d\u0642\u0627\u0642 \u0625\u062c\u0627\u0632\u0629',
-            USAGE: '\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0625\u062c\u0627\u0632\u0629',
-            ADJUSTMENT: '\u062a\u0639\u062f\u064a\u0644 \u0631\u0635\u064a\u062f',
-            ENCASHMENT: '\u0635\u0631\u0641 \u0631\u0635\u064a\u062f',
-        };
+  async getRecentActivity(companyId?: string) {
+    const employeeFilter = companyId ? { employee: { companyId } } : {};
 
-        const activities = [
-            ...recentDeductions.map((d) => ({
-                id: d.id,
-                type: 'DEDUCTION' as const,
-                title: `${deductionLabels[d.type] || d.type} - ${d.employee?.fullName || '\u063a\u064a\u0631 \u0645\u0639\u0631\u0648\u0641'}`,
-                time: d.createdAt.toISOString(),
-                amount: `-${Number(d.amount).toFixed(2)} \u0631.\u0633`,
-                status: 'WARNING' as const,
-            })),
-            ...recentLeaves.map((l) => ({
-                id: l.id,
-                type: 'LEAVE' as const,
-                title: `${leaveLabels[l.type] || l.type} - ${l.employee?.fullName || '\u063a\u064a\u0631 \u0645\u0639\u0631\u0648\u0641'}`,
-                time: l.createdAt.toISOString(),
-                amount: `${Number(l.days).toFixed(1)} \u064a\u0648\u0645`,
-                status: (Number(l.days) >= 0 ? 'SUCCESS' : 'WARNING') as 'SUCCESS' | 'WARNING',
-            })),
-        ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 8);
+    const recentDeductions = await this.prisma.deduction.findMany({
+      where: employeeFilter,
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: { employee: { select: { fullName: true } } },
+    });
 
-        return activities;
-    }
+    const recentLeaves = await this.prisma.leaveTransaction.findMany({
+      where: employeeFilter,
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: { employee: { select: { fullName: true } } },
+    });
+
+    const deductionLabels: Record<string, string> = {
+      LOAN: '\u0633\u0644\u0641\u0629',
+      PENALTY: '\u062c\u0632\u0627\u0621',
+      ADVANCE: '\u062f\u0641\u0639\u0629 \u0645\u0642\u062f\u0645\u0629',
+      OTHER: '\u0623\u062e\u0631\u0649',
+      VACATION_EOS_BALANCE:
+        '\u0631\u0635\u064a\u062f \u0625\u062c\u0627\u0632\u0627\u062a/\u0646\u0647\u0627\u064a\u0629 \u062e\u062f\u0645\u0629',
+    };
+
+    const leaveLabels: Record<string, string> = {
+      ACCRUAL:
+        '\u0627\u0633\u062a\u062d\u0642\u0627\u0642 \u0625\u062c\u0627\u0632\u0629',
+      USAGE:
+        '\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0625\u062c\u0627\u0632\u0629',
+      ADJUSTMENT: '\u062a\u0639\u062f\u064a\u0644 \u0631\u0635\u064a\u062f',
+      ENCASHMENT: '\u0635\u0631\u0641 \u0631\u0635\u064a\u062f',
+    };
+
+    const activities = [
+      ...recentDeductions.map((d) => ({
+        id: d.id,
+        type: 'DEDUCTION' as const,
+        title: `${deductionLabels[d.type] || d.type} - ${d.employee?.fullName || '\u063a\u064a\u0631 \u0645\u0639\u0631\u0648\u0641'}`,
+        time: d.createdAt.toISOString(),
+        amount: `-${Number(d.amount).toFixed(2)} \u0631.\u0633`,
+        status: 'WARNING' as const,
+      })),
+      ...recentLeaves.map((l) => ({
+        id: l.id,
+        type: 'LEAVE' as const,
+        title: `${leaveLabels[l.type] || l.type} - ${l.employee?.fullName || '\u063a\u064a\u0631 \u0645\u0639\u0631\u0648\u0641'}`,
+        time: l.createdAt.toISOString(),
+        amount: `${Number(l.days).toFixed(1)} \u064a\u0648\u0645`,
+        status: Number(l.days) >= 0 ? 'SUCCESS' : 'WARNING',
+      })),
+    ]
+      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+      .slice(0, 8);
+
+    return activities;
+  }
 }

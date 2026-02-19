@@ -1,13 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Users, FileText, CheckCircle, Plus, Calculator, FileOutput, ArrowRightLeft, Briefcase, Tag, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Users, TrendingUp, Briefcase, Plus, Calculator, FileOutput, CheckCircle, RefreshCw, ArrowDownLeft } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { dashboardApi, companiesApi } from '../api/settingsService';
+import { dashboardApi, companiesApi, calculationsApi } from '../api/settingsService';
 import type { DashboardStats, Activity, Company } from '../api/settingsService';
 
+// Define AggregatedData interface locally or import if exported (it's not exported from api/settingsService clearly in the view, so I'll define a subset or use any)
+// actually calculationsApi.getAggregated returns 'any' in the definition I saw, but I know the structure.
+interface AggregatedSummary {
+    totalEmployees: number;
+    totalActiveEmployees: number;
+    totalTerminatedEmployees: number;
+    totalNetEOS: number;
+    totalLeaveCompensation: number;
+    totalLeaveDeductions: number;
+    totalOtherDeductions: number;
+    totalFinalPayable: number;
+    averageServiceYears: number;
+}
+
 const Dashboard: React.FC = () => {
-    const navigate = useNavigate();
+    // const navigate = useNavigate(); // Removed as we use Link
     const [statsData, setStatsData] = useState<DashboardStats | null>(null);
+    const [aggregatedData, setAggregatedData] = useState<AggregatedSummary | null>(null);
     const [activities, setActivities] = useState<Activity[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
@@ -16,12 +31,18 @@ const Dashboard: React.FC = () => {
     const fetchDashboardData = useCallback(async (companyId?: string) => {
         try {
             setLoading(true);
-            const [stats, activity] = await Promise.all([
+
+
+
+            const [stats, activity, aggregatedResult] = await Promise.all([
                 dashboardApi.getStats(companyId || undefined),
-                dashboardApi.getActivity(companyId || undefined)
+                dashboardApi.getActivity(companyId || undefined),
+                calculationsApi.getAggregated(companyId ? { companyId } : {}) // Assuming backend handles companyId in query or ignored
             ]);
+
             setStatsData(stats);
             setActivities(activity);
+            setAggregatedData(aggregatedResult.summary);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
         } finally {
@@ -56,65 +77,74 @@ const Dashboard: React.FC = () => {
         { name: 'بدلات أخرى', value: statsData.salaryChart.otherAllowances },
     ].filter(d => d.value > 0) : [];
 
-    const stats = [
+    const formatCurrency = (val: number | undefined | null) => {
+        if (val === undefined || val === null || isNaN(val)) return '0';
+        return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // New 6 Cards Configuration
+    const summaryCards = [
+        // Row 1
         {
-            label: 'إجمالي الموظفين',
-            value: statsData?.totalEmployees?.toLocaleString('ar-SA') || '0',
-            sub: selectedCompanyId ? 'للشركة المحددة' : 'كل الشركات',
+            title: 'إجمالي تعويضات الإجازات',
+            value: formatCurrency(aggregatedData?.totalLeaveCompensation),
+            sub: 'ر.س',
+            color: '#007BFF', // Blue
+            icon: FileOutput,
+            link: '/aggregated-calculations',
+            borderTop: '4px solid #007BFF'
+        },
+        {
+            title: 'إجمالي مكافآت نهاية الخدمة',
+            value: formatCurrency(aggregatedData?.totalNetEOS),
+            sub: 'ر.س',
+            color: '#FD7E14', // Orange
+            icon: TrendingUp,
+            link: '/aggregated-calculations',
+            borderTop: '4px solid #FD7E14'
+        },
+        {
+            title: 'متوسط سنوات الخدمة',
+            value: `${(aggregatedData?.averageServiceYears || 0).toFixed(1)} سنة`,
+            sub: aggregatedData ? `إجمالي الموظفين: ${aggregatedData.totalEmployees}` : 'تحميل...',
+            activeText: aggregatedData ? `نشط: ${aggregatedData.totalActiveEmployees} | منهي: ${aggregatedData.totalTerminatedEmployees}` : '',
+            color: '#28A745', // Green
             icon: Users,
-            color: '#2E7D32',
-            bg: '#E8F5E9',
-            link: '/employees'
+            link: '/employees',
+            borderTop: '4px solid #28A745'
         },
+        // Row 2
         {
-            label: 'إجمالي الرواتب',
-            value: statsData?.totalSalaries?.toLocaleString('ar-SA') || '0',
-            sub: 'ريال سعودي',
-            icon: ArrowRightLeft,
-            color: '#17A2B8',
-            bg: '#D1ECF1',
-            link: '/reports'
-        },
-        {
-            label: 'التزامات نهاية الخدمة',
-            value: statsData?.eosLiability || '0',
-            sub: selectedCompanyId ? 'للشركة المحددة' : 'لكافة الشركات',
-            icon: FileText,
-            color: '#DC3545',
-            bg: '#F8D7DA',
-            link: '/aggregated-calculations'
-        },
-        {
-            label: 'الفروع',
-            value: statsData?.branchesCount?.toString() || '0',
-            sub: 'من إعدادات المنشأة',
-            icon: CheckCircle,
-            color: '#6610F2',
-            bg: '#E0D4FC',
-            link: '/settings',
-            state: { activeTab: 'organization', orgActiveTab: 'branches' }
-        },
-        {
-            label: 'الوظائف',
-            value: statsData?.jobsCount?.toString() || '0',
-            sub: 'مسمى وظيفي',
+            title: 'صافي المبالغ المستحقة',
+            value: formatCurrency(aggregatedData?.totalFinalPayable),
+            sub: 'ر.س',
+            color: '#212529', // Dark text for readability on yellow? Or White?
+            bgColor: '#FFC107', // Gold background
             icon: Briefcase,
-            color: '#007BFF',
-            bg: '#CCE5FF',
-            link: '/settings',
-            state: { activeTab: 'organization', orgActiveTab: 'jobs' }
+            link: '/reports',
+            isSpecial: true
         },
         {
-            label: 'التصنيفات',
-            value: statsData?.classificationsCount?.toString() || '0',
-            sub: 'تصنيف',
-            icon: Tag,
-            color: '#FD7E14',
-            bg: '#FFE8CC',
-            link: '/settings',
-            state: { activeTab: 'organization', orgActiveTab: 'classifications' }
+            title: 'إجمالي الخصومات الأخرى',
+            value: formatCurrency(aggregatedData?.totalOtherDeductions),
+            sub: 'ر.س',
+            color: '#DC3545', // Red
+            icon: ArrowDownLeft,
+            link: '/reports',
+            borderTop: '4px solid #DC3545'
         },
+        {
+            title: 'إجمالي خصم الإجازات',
+            value: formatCurrency(aggregatedData?.totalLeaveDeductions),
+            sub: 'ر.س',
+            color: '#DC3545', // Red
+            icon: ArrowDownLeft,
+            link: '/reports',
+            borderTop: '4px solid #DC3545'
+        }
     ];
+
+
 
     const quickActions = [
         { label: 'إضافة موظف جديد', icon: Plus, color: '#2E7D32', link: '/employees' },
@@ -123,7 +153,7 @@ const Dashboard: React.FC = () => {
         { label: 'تسجيل إجازة', icon: CheckCircle, color: '#FD7E14', link: '/leave-management' },
     ];
 
-    if (loading && !statsData) {
+    if (loading && !statsData && !aggregatedData) {
         return <div style={{ padding: '40px', textAlign: 'center' }}>جاري تحميل لوحة التحكم...</div>;
     }
 
@@ -133,7 +163,7 @@ const Dashboard: React.FC = () => {
             <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#111' }}>نظرة عامة للمجموعة</h2>
-                    <p style={{ color: '#6C757D', marginTop: '4px' }}>تقرير موحد لجميع الشركات والفروع التابعة.</p>
+                    <p style={{ color: '#6C757D', marginTop: '4px' }}>تقرير مالي وتشغيلي موحد.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <select
@@ -176,63 +206,91 @@ const Dashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-                {stats.map((stat, index) => (
-                    <div
+            {/* New Stats Grid - 6 Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+                {summaryCards.map((card, index) => (
+                    <Link
                         key={index}
+                        to={card.link}
                         className="card"
                         style={{
-                            display: 'flex', flexDirection: 'column', padding: '20px',
-                            cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s',
-                            opacity: loading ? 0.7 : 1
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '24px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            opacity: loading ? 0.7 : 1,
+                            border: '1px solid #E9ECEF',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            backgroundColor: card.bgColor || '#fff',
+                            borderTop: card.borderTop,
+                            height: '100%',
+                            position: 'relative'
                         }}
-                        onClick={() => navigate(stat.link, { state: stat.state })}
-                        onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
+                        onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.08)'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)'; }}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                            <div style={{
-                                width: '44px', height: '44px', borderRadius: '12px',
-                                backgroundColor: stat.bg, display: 'flex', alignItems: 'center',
-                                justifyContent: 'center', color: stat.color
-                            }}>
-                                <stat.icon size={22} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                            <div style={{ fontSize: '0.95rem', color: card.bgColor ? '#212529' : '#6C757D', fontWeight: '600' }}>{card.title}</div>
+                            {card.icon && (
+                                <div style={{ color: card.color }}>
+                                    <card.icon size={20} />
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ marginTop: 'auto' }}>
+                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: card.bgColor ? '#212529' : card.color, marginBottom: '4px', direction: 'ltr', textAlign: 'right' }}>
+                                {card.value}
                             </div>
-                            <span style={{ fontSize: '0.75rem', color: stat.color, fontWeight: '600', opacity: 0.8 }}>{stat.sub}</span>
+
+                            {card.activeText && (
+                                <div style={{ fontSize: '0.75rem', color: '#6C757D', marginTop: '4px' }}>
+                                    {card.activeText}
+                                </div>
+                            )}
+
+                            {card.sub && !card.activeText && (
+                                <div style={{ fontSize: '0.8rem', color: card.bgColor ? '#212529' : '#6C757D', opacity: 0.8 }}>
+                                    {card.sub}
+                                </div>
+                            )}
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.85rem', color: '#6C757D', marginBottom: '4px' }}>{stat.label}</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#212529' }}>{stat.value}</div>
-                        </div>
-                    </div>
+                    </Link>
                 ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', alignItems: 'start' }}>
                 {/* Main Column */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
                     {/* Quick Actions */}
                     <div className="card">
-                        <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 'bold' }}>إجراءات سريعة</h3>
+                        <h3 style={{ marginBottom: '20px', fontSize: '1.1rem', fontWeight: 'bold' }}>الوصول السريع</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                             {quickActions.map((action, idx) => (
-                                <button key={idx} style={{
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                    justifyContent: 'center', padding: '24px', backgroundColor: '#F8F9FA',
-                                    border: '1px solid #E9ECEF', borderRadius: '8px', cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                    onClick={() => navigate(action.link)}
-                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E9ECEF'}
-                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
+                                <Link
+                                    key={idx}
+                                    to={action.link}
+                                    style={{
+                                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                        justifyContent: 'center', padding: '20px', backgroundColor: '#fff',
+                                        border: '1px solid #E9ECEF', borderRadius: '12px', cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        gap: '12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F8F9FA'; e.currentTarget.style.borderColor = '#DEE2E6'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#fff'; e.currentTarget.style.borderColor = '#E9ECEF'; }}
                                 >
-                                    <div style={{ marginBottom: '12px', color: action.color }}>
-                                        <action.icon size={28} />
+                                    <div style={{ color: action.color, padding: '10px', borderRadius: '50%', backgroundColor: `${action.color}15` }}>
+                                        <action.icon size={24} />
                                     </div>
-                                    <span style={{ fontWeight: '600', color: '#495057' }}>{action.label}</span>
-                                </button>
+                                    <span style={{ fontWeight: '600', color: '#495057', fontSize: '0.95rem' }}>{action.label}</span>
+                                </Link>
                             ))}
                         </div>
                     </div>
@@ -240,7 +298,7 @@ const Dashboard: React.FC = () => {
                     {/* Salary Distribution Chart */}
                     <div className="card" style={{ minHeight: '400px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>توزيع الرواتب والبدلات</h3>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>هيكل الرواتب والبدلات</h3>
                             {selectedCompanyId && (
                                 <span style={{ fontSize: '0.85rem', color: '#6C757D', backgroundColor: '#F0F0F0', padding: '4px 12px', borderRadius: '12px' }}>
                                     {companies.find(c => c.id === selectedCompanyId)?.name || ''}
@@ -254,7 +312,7 @@ const Dashboard: React.FC = () => {
                                         data={salaryChartData}
                                         cx="50%"
                                         cy="50%"
-                                        innerRadius={70}
+                                        innerRadius={80}
                                         outerRadius={120}
                                         paddingAngle={4}
                                         dataKey="value"
@@ -266,8 +324,9 @@ const Dashboard: React.FC = () => {
                                     </Pie>
                                     <Tooltip
                                         formatter={(value: number | undefined) => (value ?? 0).toLocaleString('ar-SA') + ' ر.س'}
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                     />
-                                    <Legend />
+                                    <Legend iconType="circle" />
                                 </PieChart>
                             </ResponsiveContainer>
                         ) : (
@@ -286,20 +345,21 @@ const Dashboard: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
                     <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-                        <div style={{ padding: '20px', borderBottom: '1px solid #E9ECEF', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                            آخر العمليات
+                        <div style={{ padding: '20px', borderBottom: '1px solid #E9ECEF', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <RefreshCw size={18} color="#6C757D" />
+                            <span>آخر العمليات</span>
                         </div>
                         <div>
                             {activities.length > 0 ? activities.map((activity) => (
                                 <div key={activity.id} style={{
-                                    padding: '14px 20px', borderBottom: '1px solid #F1F3F5',
+                                    padding: '16px 20px', borderBottom: '1px solid #F1F3F5',
                                     display: 'flex', alignItems: 'center', gap: '12px',
                                     transition: 'background 0.2s', cursor: 'pointer'
                                 }}
                                     className="hover-bg"
                                 >
                                     <div style={{
-                                        width: '36px', height: '36px', borderRadius: '50%',
+                                        width: '40px', height: '40px', borderRadius: '50%',
                                         backgroundColor: activity.type === 'DEDUCTION' ? '#FCE4EC' : '#E8F5E9',
                                         color: activity.type === 'DEDUCTION' ? '#E91E63' : '#2E7D32',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -308,13 +368,13 @@ const Dashboard: React.FC = () => {
                                         {activity.type === 'DEDUCTION' ? 'خصم' : 'إجازة'}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#343A40', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activity.title}</div>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#343A40', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activity.title}</div>
                                         <div style={{ fontSize: '0.75rem', color: '#ADB5BD' }}>
                                             {new Date(activity.time).toLocaleDateString('ar-SA')}
                                         </div>
                                     </div>
                                     <div style={{
-                                        fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+                                        fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap',
                                         color: activity.amount.startsWith('-') ? '#DC3545' : '#28A745'
                                     }}>
                                         {activity.amount}
@@ -328,12 +388,12 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="card" style={{ background: 'linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)', color: 'white' }}>
+                    <div className="card" style={{ background: 'linear-gradient(135deg, #1A237E 0%, #0D47A1 100%)', color: 'white' }}>
                         <h3 style={{ marginBottom: '12px', fontSize: '1.25rem' }}>هل تحتاج مساعدة؟</h3>
                         <p style={{ opacity: 0.9, marginBottom: '20px', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                            فريق الدعم الفني جاهز لمساعدتك في أي وقت. تواصل معنا إذا واجهت أي مشكلة في الحسابات.
+                            فريق الدعم الفني جاهز لمساعدتك في ضبط إعدادات النظام واحتساب المستحقات.
                         </p>
-                        <button className="btn" style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', width: '100%', border: 'none' }}>
+                        <button className="btn" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', width: '100%', border: 'none', fontWeight: 'bold' }}>
                             تواصل مع الدعم
                         </button>
                     </div>

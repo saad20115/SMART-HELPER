@@ -4,8 +4,8 @@ import { EosCalculationService } from './eos.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [EosController],
-    providers: [EosCalculationService],
+  imports: [PrismaModule],
+  controllers: [EosController],
+  providers: [EosCalculationService],
 })
-export class CalculationsModule { }
+export class CalculationsModule {}

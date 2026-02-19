@@ -19,7 +19,7 @@ export interface ImportSummary {
 export class ImportExportService {
   private readonly logger = new Logger(ImportExportService.name);
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async importEmployees(
     file: Express.Multer.File,
@@ -34,7 +34,9 @@ export class ImportExportService {
       throw new Error('Company ID is required');
     }
 
-    this.logger.log(`Starting import for company ${companyId}, file: ${file.originalname}`);
+    this.logger.log(
+      `Starting import for company ${companyId}, file: ${file.originalname}`,
+    );
 
     // Parse the Excel/CSV file
     let data: any[] = [];
@@ -42,7 +44,7 @@ export class ImportExportService {
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      data = XLSX.utils.sheet_to_json(worksheet) as any[];
+      data = XLSX.utils.sheet_to_json(worksheet);
 
       // Filter out completely empty rows
       data = data.filter((row) => {
@@ -57,7 +59,9 @@ export class ImportExportService {
       this.logger.log(`Parsed ${data.length} data rows from file`);
     } catch (error) {
       this.logger.error('Error parsing file:', error);
-      throw new Error('Failed to parse file. Please ensure it is a valid Excel or CSV file.');
+      throw new Error(
+        'Failed to parse file. Please ensure it is a valid Excel or CSV file.',
+      );
     }
 
     // Create import log
@@ -73,7 +77,8 @@ export class ImportExportService {
       },
     });
 
-    const finalErrors: Array<{ row: number; field?: string; message: string }> = [];
+    const finalErrors: Array<{ row: number; field?: string; message: string }> =
+      [];
     const importErrorsToCreate: Prisma.ImportErrorCreateManyInput[] = [];
     let successCount = 0;
     let failedCount = 0;
@@ -86,10 +91,14 @@ export class ImportExportService {
 
       // Pre-fetch all IDs to check duplicates efficiently
       const nationalIdsToCheck = data
-        .map((row) => String(row['رقم الهوية'] || row['National ID'] || '').trim())
+        .map((row) =>
+          String(row['رقم الهوية'] || row['National ID'] || '').trim(),
+        )
         .filter((id) => id !== '');
       const empNumsToCheck = data
-        .map((row) => String(row['رقم الموظف'] || row['Employee Number'] || '').trim())
+        .map((row) =>
+          String(row['رقم الموظف'] || row['Employee Number'] || '').trim(),
+        )
         .filter((num) => num !== '');
 
       const existingNationalIds = new Set<string>();
@@ -114,7 +123,9 @@ export class ImportExportService {
 
       for (let i = 0; i < data.length; i += batchSize) {
         const batch = data.slice(i, i + batchSize);
-        this.logger.log(`Processing batch ${i / batchSize + 1} (${batch.length} rows)`);
+        this.logger.log(
+          `Processing batch ${i / batchSize + 1} (${batch.length} rows)`,
+        );
 
         for (let j = 0; j < batch.length; j++) {
           const row = batch[j];
@@ -123,19 +134,45 @@ export class ImportExportService {
           // Mapping
           const rawEmpData = {
             companyId,
-            employeeNumber: String(row['رقم الموظف'] || row['Employee Number'] || '').trim(),
-            fullName: String(row['الاسم الكامل'] || row['Full Name'] || '').trim(),
-            nationalId: String(row['رقم الهوية'] || row['National ID'] || '').trim(),
-            jobTitle: String(row['المسمى الوظيفي'] || row['Job Title'] || '').trim(),
+            employeeNumber: String(
+              row['رقم الموظف'] || row['Employee Number'] || '',
+            ).trim(),
+            fullName: String(
+              row['الاسم الكامل'] || row['Full Name'] || '',
+            ).trim(),
+            nationalId: String(
+              row['رقم الهوية'] || row['National ID'] || '',
+            ).trim(),
+            jobTitle: String(
+              row['المسمى الوظيفي'] || row['Job Title'] || '',
+            ).trim(),
             branch: row['الفرع'] || row['Branch'],
-            basicSalary: parseFloat(String(row['الراتب الأساسي'] || row['Basic Salary'] || '0')),
-            housingAllowance: parseFloat(String(row['بدل السكن'] || row['Housing Allowance'] || '0')),
-            transportAllowance: parseFloat(String(row['بدل النقل'] || row['Transport Allowance'] || '0')),
-            otherAllowances: parseFloat(String(row['بدلات أخرى'] || row['Other Allowances'] || '0')),
+            basicSalary: parseFloat(
+              String(row['الراتب الأساسي'] || row['Basic Salary'] || '0'),
+            ),
+            housingAllowance: parseFloat(
+              String(row['بدل السكن'] || row['Housing Allowance'] || '0'),
+            ),
+            transportAllowance: parseFloat(
+              String(row['بدل النقل'] || row['Transport Allowance'] || '0'),
+            ),
+            otherAllowances: parseFloat(
+              String(row['بدلات أخرى'] || row['Other Allowances'] || '0'),
+            ),
             hireDate: this.parseDate(row['تاريخ التعيين'] || row['Hire Date']),
-            endDate: (row['تاريخ الانتهاء'] || row['End Date']) ? this.parseDate(row['تاريخ الانتهاء'] || row['End Date']) : null,
+            endDate:
+              row['تاريخ الانتهاء'] || row['End Date']
+                ? this.parseDate(row['تاريخ الانتهاء'] || row['End Date'])
+                : null,
             terminationType: row['نوع الانتهاء'] || row['Termination Type'],
-            vacationBalance: parseFloat(String(row['رصيد الإجازات'] || row['Vacation Balance'] || row['رصيد الاجازات'] || '0')),
+            vacationBalance: parseFloat(
+              String(
+                row['رصيد الإجازات'] ||
+                  row['Vacation Balance'] ||
+                  row['رصيد الاجازات'] ||
+                  '0',
+              ),
+            ),
             status: 'active',
           };
 
@@ -144,18 +181,31 @@ export class ImportExportService {
           const validationErrors = await validate(empDto);
 
           if (validationErrors.length > 0) {
-            const msg = validationErrors.map((err) => Object.values(err.constraints || {}).join(', ')).join('; ');
+            const msg = validationErrors
+              .map((err) => Object.values(err.constraints || {}).join(', '))
+              .join('; ');
             finalErrors.push({ row: rowNumber, message: msg });
-            importErrorsToCreate.push({ importLogId: importLog.id, rowNumber, errorMessage: msg });
+            importErrorsToCreate.push({
+              importLogId: importLog.id,
+              rowNumber,
+              errorMessage: msg,
+            });
             failedCount++;
             continue;
           }
 
           // Duplicate Check
-          if (existingNationalIds.has(rawEmpData.nationalId) || existingEmpNums.has(rawEmpData.employeeNumber)) {
+          if (
+            existingNationalIds.has(rawEmpData.nationalId) ||
+            existingEmpNums.has(rawEmpData.employeeNumber)
+          ) {
             const msg = 'موظف موجود مسبقاً / Duplicate employee';
             finalErrors.push({ row: rowNumber, message: msg });
-            importErrorsToCreate.push({ importLogId: importLog.id, rowNumber, errorMessage: msg });
+            importErrorsToCreate.push({
+              importLogId: importLog.id,
+              rowNumber,
+              errorMessage: msg,
+            });
             failedCount++;
             continue;
           }
@@ -163,12 +213,20 @@ export class ImportExportService {
           if (!rawEmpData.hireDate) {
             const msg = 'تاريخ التعيين غير صالح / Invalid hire date';
             finalErrors.push({ row: rowNumber, message: msg });
-            importErrorsToCreate.push({ importLogId: importLog.id, rowNumber, errorMessage: msg });
+            importErrorsToCreate.push({
+              importLogId: importLog.id,
+              rowNumber,
+              errorMessage: msg,
+            });
             failedCount++;
             continue;
           }
 
-          const totalSalary = rawEmpData.basicSalary + rawEmpData.housingAllowance + rawEmpData.transportAllowance + rawEmpData.otherAllowances;
+          const totalSalary =
+            rawEmpData.basicSalary +
+            rawEmpData.housingAllowance +
+            rawEmpData.transportAllowance +
+            rawEmpData.otherAllowances;
 
           readyToInsertEmployees.push({
             companyId: rawEmpData.companyId,
@@ -194,21 +252,30 @@ export class ImportExportService {
 
         // Insert errors in batches too
         if (importErrorsToCreate.length >= 100) {
-          await this.prisma.importError.createMany({ data: importErrorsToCreate.splice(0, importErrorsToCreate.length) });
+          await this.prisma.importError.createMany({
+            data: importErrorsToCreate.splice(0, importErrorsToCreate.length),
+          });
         }
       }
 
       // Final write for remaining errors
       if (importErrorsToCreate.length > 0) {
-        await this.prisma.importError.createMany({ data: importErrorsToCreate });
+        await this.prisma.importError.createMany({
+          data: importErrorsToCreate,
+        });
       }
 
       // 4. Bulk Insert Employees in Chunks
       if (readyToInsertEmployees.length > 0) {
-        this.logger.log(`Inserting ${readyToInsertEmployees.length} employees...`);
+        this.logger.log(
+          `Inserting ${readyToInsertEmployees.length} employees...`,
+        );
         for (let i = 0; i < readyToInsertEmployees.length; i += batchSize) {
           const chunk = readyToInsertEmployees.slice(i, i + batchSize);
-          await this.prisma.employee.createMany({ data: chunk, skipDuplicates: true });
+          await this.prisma.employee.createMany({
+            data: chunk,
+            skipDuplicates: true,
+          });
         }
 
         // 5. Build related records
@@ -237,7 +304,9 @@ export class ImportExportService {
         }
 
         if (balancesToInsert.length > 0) {
-          this.logger.log(`Inserting ${balancesToInsert.length} leave balances...`);
+          this.logger.log(
+            `Inserting ${balancesToInsert.length} leave balances...`,
+          );
           for (let i = 0; i < balancesToInsert.length; i += batchSize) {
             const chunk = balancesToInsert.slice(i, i + batchSize);
             await this.prisma.leaveBalance.createMany({ data: chunk });
@@ -245,17 +314,22 @@ export class ImportExportService {
 
           const createdBalances = await this.prisma.leaveBalance.findMany({
             where: { employeeId: { in: createdEmployees.map((e) => e.id) } },
-            select: { id: true, employeeId: true, calculatedRemainingDays: true },
+            select: {
+              id: true,
+              employeeId: true,
+              calculatedRemainingDays: true,
+            },
           });
 
-          const transactions: Prisma.LeaveTransactionCreateManyInput[] = createdBalances.map((b) => ({
-            employeeId: b.employeeId,
-            leaveBalanceId: b.id,
-            type: 'ADJUSTMENT',
-            days: b.calculatedRemainingDays,
-            reason: 'رصيد ابتدائي عند الاستيراد',
-            performedBy: 'system',
-          }));
+          const transactions: Prisma.LeaveTransactionCreateManyInput[] =
+            createdBalances.map((b) => ({
+              employeeId: b.employeeId,
+              leaveBalanceId: b.id,
+              type: 'ADJUSTMENT',
+              days: b.calculatedRemainingDays,
+              reason: 'رصيد ابتدائي عند الاستيراد',
+              performedBy: 'system',
+            }));
 
           for (let i = 0; i < transactions.length; i += batchSize) {
             const chunk = transactions.slice(i, i + batchSize);
@@ -268,7 +342,11 @@ export class ImportExportService {
       this.logger.error('Critical error during import:', error);
       await this.prisma.importLog.update({
         where: { id: importLog.id },
-        data: { status: ImportStatus.FAILED, failedRows: data.length, successRows: 0 },
+        data: {
+          status: ImportStatus.FAILED,
+          failedRows: data.length,
+          successRows: 0,
+        },
       });
       throw error;
     }
@@ -279,7 +357,10 @@ export class ImportExportService {
       data: {
         successRows: successCount,
         failedRows: failedCount,
-        status: failedCount === data.length ? ImportStatus.FAILED : ImportStatus.COMPLETED,
+        status:
+          failedCount === data.length
+            ? ImportStatus.FAILED
+            : ImportStatus.COMPLETED,
       },
     });
 
@@ -328,7 +409,9 @@ export class ImportExportService {
       'بدلات أخرى': emp.otherAllowances.toString(),
       'إجمالي الراتب': emp.totalSalary.toString(),
       'تاريخ التعيين': emp.hireDate.toISOString().split('T')[0],
-      'تاريخ الانتهاء': emp.endDate ? emp.endDate.toISOString().split('T')[0] : '',
+      'تاريخ الانتهاء': emp.endDate
+        ? emp.endDate.toISOString().split('T')[0]
+        : '',
       'نوع الانتهاء': emp.terminationType || '',
     }));
 
@@ -444,10 +527,12 @@ export class ImportExportService {
               return parsedDate.toISOString();
             }
           }
-        } catch (e) { }
+        } catch (e) {}
       }
 
-      const normalized = trimmed.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString());
+      const normalized = trimmed.replace(/[٠-٩]/g, (d) =>
+        '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString(),
+      );
       if (normalized !== trimmed) {
         for (const fmt of formats) {
           try {
@@ -457,7 +542,7 @@ export class ImportExportService {
                 return parsedDate.toISOString();
               }
             }
-          } catch (e) { }
+          } catch (e) {}
         }
       }
     }

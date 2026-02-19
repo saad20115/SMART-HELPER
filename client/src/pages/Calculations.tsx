@@ -30,7 +30,7 @@ const Calculations: React.FC = () => {
 
         try {
             if (activeTab === 'EOS') {
-                const data = await calculationsApi.calculateEOS(selectedEmployee);
+                const data = await calculationsApi.calculateEOS(selectedEmployee, terminationType);
                 setEosResult(data);
             } else {
                 const data = await calculationsApi.calculateVacation(selectedEmployee, manualDays || undefined);

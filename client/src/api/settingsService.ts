@@ -209,8 +209,14 @@ export interface DashboardStats {
     jobsCount: number;
     classificationsCount: number;
     totalSalaries: number;
-    eosLiability: string;
-    salaryChart: SalaryChart;
+    eosLiability: number;
+    totalLeaveCompensation: number;
+    salaryChart: {
+        basicSalary: number;
+        housingAllowance: number;
+        transportAllowance: number;
+        otherAllowances: number;
+    };
 }
 
 export interface Activity {
@@ -237,8 +243,8 @@ export const dashboardApi = {
 };
 
 export const calculationsApi = {
-    calculateEOS: async (employeeId: string): Promise<any> => {
-        const response = await apiClient.post(`/calculations/eos/${employeeId}`);
+    calculateEOS: async (employeeId: string, terminationType?: string): Promise<any> => {
+        const response = await apiClient.post(`/calculations/eos/${employeeId}`, { terminationType });
         return response.data;
     },
     calculateVacation: async (employeeId: string, days?: number): Promise<any> => {

@@ -4,9 +4,9 @@ import { ImportExportController } from './import-export.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [ImportExportController],
-    providers: [ImportExportService],
-    exports: [ImportExportService],
+  imports: [PrismaModule],
+  controllers: [ImportExportController],
+  providers: [ImportExportService],
+  exports: [ImportExportService],
 })
-export class ImportExportModule { }
+export class ImportExportModule {}

@@ -5,9 +5,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { LeaveModule } from '../leave/leave.module';
 
 @Module({
-    imports: [PrismaModule, LeaveModule],
-    controllers: [EmployeesController],
-    providers: [EmployeesService],
-    exports: [EmployeesService],
+  imports: [PrismaModule, LeaveModule],
+  controllers: [EmployeesController],
+  providers: [EmployeesService],
+  exports: [EmployeesService],
 })
-export class EmployeesModule { }
+export class EmployeesModule {}

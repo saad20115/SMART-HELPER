@@ -9,7 +9,7 @@ export class EmployeesService {
   constructor(
     private prisma: PrismaService,
     private leaveService: LeaveService,
-  ) { }
+  ) {}
 
   async create(createEmployeeDto: CreateEmployeeDto) {
     const {
@@ -49,7 +49,8 @@ export class EmployeesService {
           annualEntitledDays: 21,
           annualUsedDays: 0,
           calculatedRemainingDays: Number(createEmployeeDto.vacationBalance),
-          leaveValue: Number(createEmployeeDto.vacationBalance) * (totalSalary / 30),
+          leaveValue:
+            Number(createEmployeeDto.vacationBalance) * (totalSalary / 30),
         },
       });
 
@@ -156,7 +157,10 @@ export class EmployeesService {
       data.endDate = new Date(prismaUpdateData.endDate);
     }
 
-    console.log('[UPDATE] Step 3: Calling prisma.employee.update', JSON.stringify(data));
+    console.log(
+      '[UPDATE] Step 3: Calling prisma.employee.update',
+      JSON.stringify(data),
+    );
     const updatedEmployee = await this.prisma.employee.update({
       where: { id },
       data,

@@ -20,9 +20,11 @@ async function bootstrap() {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1 ||
+      if (
+        allowedOrigins.indexOf(origin) !== -1 ||
         origin.endsWith('.vercel.app') ||
-        origin.endsWith('.onrender.com')) {
+        origin.endsWith('.onrender.com')
+      ) {
         callback(null, true);
       } else {
         console.warn(`Blocked CORS request from origin: ${origin}`);

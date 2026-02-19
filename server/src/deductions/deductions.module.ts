@@ -4,9 +4,9 @@ import { DeductionsController } from './deductions.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [DeductionsController],
-    providers: [DeductionsService],
-    exports: [DeductionsService],
+  imports: [PrismaModule],
+  controllers: [DeductionsController],
+  providers: [DeductionsService],
+  exports: [DeductionsService],
 })
-export class DeductionsModule { }
+export class DeductionsModule {}

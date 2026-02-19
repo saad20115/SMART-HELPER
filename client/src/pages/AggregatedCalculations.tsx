@@ -19,9 +19,12 @@ interface EmployeeEntitlement {
     netEOS: number;
     leaveCompensation: number;
     leaveBalanceDays: number;
+    leaveDeductions: number;
+    otherDeductions: number;
     totalDeductions: number;
     finalPayable: number;
     isActive: boolean;
+    entitlementRatio: number;
 }
 
 interface AggregatedData {
@@ -32,6 +35,8 @@ interface AggregatedData {
         totalGrossEOS: number;
         totalNetEOS: number;
         totalLeaveCompensation: number;
+        totalLeaveDeductions: number;
+        totalOtherDeductions: number;
         totalDeductions: number;
         totalFinalPayable: number;
         averageServiceYears: number;
@@ -83,14 +88,11 @@ const AggregatedCalculations: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const formatCurrency = (val: number) => {
-        return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formatCurrency = (val: number | undefined | null) => {
+        return (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    const formatDate = (dateStr: string | null) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('ar-SA');
-    };
+
 
     const toggleRowExpansion = (id: string) => {
         const newExpanded = new Set(expandedRows);
@@ -247,47 +249,64 @@ const AggregatedCalculations: React.FC = () => {
             {data && (
                 <>
                     {/* Summary Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-                        <div className="card" style={{ background: 'linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)', color: 'white', padding: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                <Users size={32} />
-                                <div>
-                                    <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>إجمالي الموظفين</div>
-                                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{data.summary.totalEmployees}</div>
-                                </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                        {/* Row 1: General Info & Entitlements */}
+                        <div className="card" style={{ borderTop: '4px solid #28A745' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '0.9rem', color: '#6C757D' }}>إجمالي الموظفين</div>
+                                <Users size={20} color="#28A745" />
                             </div>
-                            <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#28A745' }}>
+                                {data.summary.totalEmployees}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#6C757D' }}>
                                 نشط: {data.summary.totalActiveEmployees} | منتهي: {data.summary.totalTerminatedEmployees}
                             </div>
                         </div>
 
-                        <div className="card" style={{ borderTop: '4px solid #2E7D32' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                <TrendingUp size={24} color="#2E7D32" />
-                                <span style={{ fontSize: '0.9rem', color: '#6C757D' }}>متوسط سنوات الخدمة</span>
+                        <div className="card" style={{ borderTop: '4px solid #28A745' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '0.9rem', color: '#6C757D' }}>متوسط سنوات الخدمة</div>
+                                <TrendingUp size={20} color="#28A745" />
                             </div>
-                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#2E7D32' }}>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#28A745' }}>
                                 {data.summary.averageServiceYears.toFixed(1)} سنة
                             </div>
                         </div>
 
-                        <div className="card" style={{ borderTop: '4px solid #FF9800' }}>
+                        <div className="card" style={{ borderTop: '4px solid #fd7e14' }}>
                             <div style={{ fontSize: '0.9rem', color: '#6C757D', marginBottom: '8px' }}>إجمالي مكافآت نهاية الخدمة</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#FF9800' }}>
-                                {formatCurrency(data.summary.totalNetEOS)} ر.س
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fd7e14' }}>
+                                {formatCurrency(data.summary.totalGrossEOS)} ر.س
                             </div>
                         </div>
 
-                        <div className="card" style={{ borderTop: '4px solid #1976D2' }}>
+                        <div className="card" style={{ borderTop: '4px solid #007BFF' }}>
                             <div style={{ fontSize: '0.9rem', color: '#6C757D', marginBottom: '8px' }}>إجمالي تعويضات الإجازات</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1976D2' }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#007BFF' }}>
                                 {formatCurrency(data.summary.totalLeaveCompensation)} ر.س
                             </div>
                         </div>
 
-                        <div className="card" style={{ background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', color: '#333' }}>
-                            <div style={{ fontSize: '0.9rem', marginBottom: '8px', fontWeight: '600' }}>صافي المبالغ المستحقة</div>
-                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>
+                        {/* Row 2: Deductions & Net Payable */}
+                        <div className="card" style={{ borderTop: '4px solid #DC3545' }}>
+                            <div style={{ fontSize: '0.9rem', color: '#6C757D', marginBottom: '8px' }}>إجمالي خصم الإجازات</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#DC3545' }}>
+                                {formatCurrency(data.summary.totalLeaveDeductions)} ر.س
+                            </div>
+                        </div>
+
+                        <div className="card" style={{ borderTop: '4px solid #DC3545' }}>
+                            <div style={{ fontSize: '0.9rem', color: '#6C757D', marginBottom: '8px' }}>إجمالي الخصومات الأخرى</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#DC3545' }}>
+                                {formatCurrency(data.summary.totalOtherDeductions)} ر.س
+                            </div>
+                        </div>
+
+                        {/* Spacer to align Net Payable to the end or keep it next to deductions */}
+                        <div className="card" style={{ borderTop: '4px solid #FFC107', backgroundColor: '#FFC107', gridColumn: 'span 2' }}>
+                            <div style={{ fontSize: '0.9rem', color: '#212529', marginBottom: '8px', fontWeight: '600' }}>صافي المبالغ المستحقة</div>
+                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#212529' }}>
                                 {formatCurrency(data.summary.totalFinalPayable)} ر.س
                             </div>
                         </div>
@@ -347,11 +366,16 @@ const AggregatedCalculations: React.FC = () => {
                                                 <td style={{ padding: '14px 16px', fontWeight: '600' }}>{emp.fullName}</td>
                                                 <td style={{ padding: '14px 16px', color: '#6C757D' }}>{emp.employeeNumber}</td>
                                                 <td style={{ padding: '14px 16px', color: '#6C757D' }}>{emp.branch || '-'}</td>
-                                                <td style={{ padding: '14px 16px' }}>{emp.serviceYears.toFixed(1)}</td>
+                                                <td style={{ padding: '14px 16px' }}>{emp.serviceYears.toFixed(2)}</td>
                                                 <td style={{ padding: '14px 16px', fontWeight: '600' }}>{formatCurrency(emp.basicSalary || 0)}</td>
                                                 <td style={{ padding: '14px 16px', fontWeight: '600', color: '#2E7D32' }}>{formatCurrency(emp.totalSalary || 0)}</td>
-                                                <td style={{ padding: '14px 16px', fontWeight: '600' }}>{Number(emp.leaveBalanceDays || 0).toFixed(2)} يوم</td>
-                                                <td style={{ padding: '14px 16px', color: '#1976D2', fontWeight: '600' }}>{formatCurrency(emp.leaveCompensation)}</td>
+                                                <td style={{ padding: '14px 16px', fontWeight: '600', color: Number(emp.leaveBalanceDays) < 0 ? '#DC3545' : 'inherit' }}>{Number(emp.leaveBalanceDays || 0).toFixed(2)} يوم</td>
+                                                <td style={{ padding: '14px 16px', fontWeight: '600', color: Number(emp.leaveBalanceDays) < 0 ? '#DC3545' : '#1976D2' }}>
+                                                    {Number(emp.leaveBalanceDays) < 0
+                                                        ? formatCurrency(emp.leaveDeductions * -1)
+                                                        : formatCurrency(emp.leaveCompensation)
+                                                    }
+                                                </td>
                                                 <td style={{ padding: '14px 16px', fontWeight: '700', color: '#2E7D32' }}>{formatCurrency(emp.finalPayable)}</td>
                                                 <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                                                     <span style={{
@@ -380,41 +404,113 @@ const AggregatedCalculations: React.FC = () => {
                                                 </td>
                                             </tr>
                                             {expandedRows.has(emp.id) && (
-                                                <tr>
-                                                    <td colSpan={11} style={{ backgroundColor: '#F8F9FA', padding: '20px' }}>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                                <tr style={{ backgroundColor: '#F8F9FA' }}>
+                                                    <td colSpan={11} style={{ padding: '0' }}>
+                                                        <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', borderBottom: '2px solid #E9ECEF' }}>
+
+                                                            {/* EOS Details */}
                                                             <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>المسمى الوظيفي</div>
-                                                                <div style={{ fontWeight: '600' }}>{emp.jobTitle}</div>
+                                                                <h4 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#495057', marginBottom: '16px', borderBottom: '1px solid #DEE2E6', paddingBottom: '8px' }}>
+                                                                    <TrendingUp size={16} style={{ display: 'inline', margin: '0 0 0 8px' }} />
+                                                                    تفاصيل نهاية الخدمة
+                                                                </h4>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span style={{ color: '#6C757D' }}>تاريخ التعيين:</span>
+                                                                        <span style={{ fontWeight: '600' }}>{new Date(emp.hireDate).toLocaleDateString('en-GB')}</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span style={{ color: '#6C757D' }}>تاريخ النهاية:</span>
+                                                                        <span style={{ fontWeight: '600' }}>{emp.endDate ? new Date(emp.endDate).toLocaleDateString('en-GB') : '-'}</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span style={{ color: '#6C757D' }}>مدة الخدمة:</span>
+                                                                        <span style={{ fontWeight: '600' }}>{emp.serviceYears.toFixed(4)} سنة</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                                                                        <span style={{ color: '#6C757D' }}>إجمالي المكافأة:</span>
+                                                                        <span style={{ fontWeight: '600' }}>{formatCurrency(emp.grossEOS)}</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span style={{ color: '#6C757D' }}>نسبة الاستحقاق:</span>
+                                                                        <span style={{ fontWeight: '600', color: emp.isActive ? '#495057' : (emp.entitlementRatio < 1 ? '#DC3545' : '#28A745') }}>
+                                                                            {(emp.entitlementRatio * 100).toFixed(0)}%
+                                                                        </span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #DEE2E6', paddingTop: '8px', marginTop: '4px' }}>
+                                                                        <span style={{ fontWeight: 'bold' }}>صافي المكافأة:</span>
+                                                                        <span style={{ fontWeight: 'bold', color: '#2E7D32' }}>{formatCurrency(emp.netEOS)}</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
+
+                                                            {/* Leave Details */}
                                                             <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>التصنيف</div>
-                                                                <div style={{ fontWeight: '600' }}>{emp.classification || '-'}</div>
+                                                                <h4 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#495057', marginBottom: '16px', borderBottom: '1px solid #DEE2E6', paddingBottom: '8px' }}>
+                                                                    <FileText size={16} style={{ display: 'inline', margin: '0 0 0 8px' }} />
+                                                                    تفاصيل الإجازات
+                                                                </h4>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span style={{ color: '#6C757D' }}>الراتب الشامل (لليوم):</span>
+                                                                        <span style={{ fontWeight: '600' }}>{formatCurrency(emp.totalSalary / 30)}</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span style={{ color: '#6C757D' }}>الرصيد المتبقي:</span>
+                                                                        <span style={{ fontWeight: '600', direction: 'ltr' }}>{Number(emp.leaveBalanceDays).toFixed(4)} يوم</span>
+                                                                    </div>
+
+                                                                    {Number(emp.leaveBalanceDays) >= 0 ? (
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #DEE2E6', paddingTop: '8px', marginTop: '4px' }}>
+                                                                            <span style={{ fontWeight: 'bold' }}>تعويض الإجازات:</span>
+                                                                            <span style={{ fontWeight: 'bold', color: '#1976D2' }}>{formatCurrency(emp.leaveCompensation)}</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #DEE2E6', paddingTop: '8px', marginTop: '4px' }}>
+                                                                            <span style={{ fontWeight: 'bold' }}>خصم تجاوز رصيد:</span>
+                                                                            <span style={{ fontWeight: 'bold', color: '#DC3545' }}>{formatCurrency(emp.leaveDeductions)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
+
+                                                            {/* Financial Summary */}
                                                             <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>القسم</div>
-                                                                <div style={{ fontWeight: '600' }}>{emp.department || '-'}</div>
+                                                                <h4 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#495057', marginBottom: '16px', borderBottom: '1px solid #DEE2E6', paddingBottom: '8px' }}>
+                                                                    <Download size={16} style={{ display: 'inline', margin: '0 0 0 8px' }} />
+                                                                    ملخص المستحقات
+                                                                </h4>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span>(+) صافي نهاية الخدمة:</span>
+                                                                        <span>{formatCurrency(emp.netEOS)}</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                        <span>(+) تعويض الإجازات:</span>
+                                                                        <span>{formatCurrency(emp.leaveCompensation)}</span>
+                                                                    </div>
+
+                                                                    {emp.leaveDeductions > 0 && (
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#DC3545' }}>
+                                                                            <span>(-) خصم الإجازات:</span>
+                                                                            <span>({formatCurrency(emp.leaveDeductions)})</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {emp.otherDeductions > 0 && (
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#DC3545' }}>
+                                                                            <span>(-) خصومات أخرى:</span>
+                                                                            <span>({formatCurrency(emp.otherDeductions)})</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #343A40', paddingTop: '12px', marginTop: '8px' }}>
+                                                                        <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>صافي المستحقات:</span>
+                                                                        <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#2E7D32' }}>{formatCurrency(emp.finalPayable)}</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>تاريخ التوظيف</div>
-                                                                <div style={{ fontWeight: '600' }}>{formatDate(emp.hireDate)}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>تاريخ انتهاء الخدمة</div>
-                                                                <div style={{ fontWeight: '600' }}>{formatDate(emp.endDate)}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>مكافأة نهاية الخدمة <span style={{ fontSize: '0.7rem', color: '#FF9800' }}>(على الراتب الأساسي)</span></div>
-                                                                <div style={{ fontWeight: '600', color: '#FF9800' }}>{formatCurrency(emp.netEOS)} ر.س</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>تعويض الإجازات <span style={{ fontSize: '0.7rem', color: '#1976D2' }}>(على الراتب الشامل)</span></div>
-                                                                <div style={{ fontWeight: '600', color: '#1976D2' }}>{formatCurrency(emp.leaveCompensation)} ر.س</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginBottom: '4px' }}>الخصومات</div>
-                                                                <div style={{ fontWeight: '600', color: '#DC3545' }}>{formatCurrency(emp.totalDeductions)} ر.س</div>
-                                                            </div>
+
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -466,8 +562,9 @@ const AggregatedCalculations: React.FC = () => {
                         </div>
                     </div>
                 </>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 
