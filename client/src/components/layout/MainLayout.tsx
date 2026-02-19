@@ -1,153 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Bell, Search, Command } from 'lucide-react';
+import { Search, Bell, Moon, Sun, Command } from 'lucide-react';
+import { useTheme } from '../ThemeContext';
 
-const Header: React.FC = () => {
+const MainLayout = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-    useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    return (
-        <header style={{
-            height: isMobile ? '60px' : '72px',
-            background: 'rgba(15, 23, 42, 0.7)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: isMobile ? '0 16px' : '0 32px',
-            paddingRight: isMobile ? '70px' : '32px',
-            position: 'sticky',
-            top: 0,
-            zIndex: 900,
-        }}>
-            {/* Search */}
-            {!isMobile && (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    background: 'rgba(148, 163, 184, 0.06)',
-                    border: '1px solid rgba(148, 163, 184, 0.1)',
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    width: '320px',
-                    transition: 'all 250ms ease',
-                }}>
-                    <Search size={17} style={{ color: '#64748B', flexShrink: 0 }} />
-                    <input
-                        type="text"
-                        placeholder="بحث سريع..."
-                        style={{
-                            border: 'none',
-                            outline: 'none',
-                            width: '100%',
-                            background: 'none',
-                            color: '#F1F5F9',
-                            fontSize: '0.9rem',
-                        }}
-                    />
-                    <kbd style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '2px',
-                        padding: '2px 6px',
-                        borderRadius: '6px',
-                        background: 'rgba(148, 163, 184, 0.1)',
-                        border: '1px solid rgba(148, 163, 184, 0.15)',
-                        fontSize: '0.7rem',
-                        color: '#64748B',
-                        fontFamily: 'Inter, sans-serif',
-                    }}>
-                        <Command size={10} />K
-                    </kbd>
-                </div>
-            )}
-
-            {/* Right side */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '16px' }}>
-                {/* Notifications */}
-                <button style={{
-                    position: 'relative',
-                    background: 'rgba(148, 163, 184, 0.06)',
-                    border: '1px solid rgba(148, 163, 184, 0.1)',
-                    borderRadius: '10px',
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#94A3B8',
-                    cursor: 'pointer',
-                    transition: 'all 200ms ease',
-                }}
-                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(148, 163, 184, 0.12)'; e.currentTarget.style.color = '#F1F5F9'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(148, 163, 184, 0.06)'; e.currentTarget.style.color = '#94A3B8'; }}
-                >
-                    <Bell size={18} />
-                    <span style={{
-                        position: 'absolute',
-                        top: '8px',
-                        right: '9px',
-                        width: '7px',
-                        height: '7px',
-                        background: 'linear-gradient(135deg, #EF4444, #F87171)',
-                        borderRadius: '50%',
-                        border: '2px solid #0F172A',
-                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)',
-                    }} />
-                </button>
-
-                {/* User */}
-                {!isMobile && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '6px 14px 6px 6px',
-                        borderRadius: '12px',
-                        background: 'rgba(148, 163, 184, 0.06)',
-                        border: '1px solid rgba(148, 163, 184, 0.1)',
-                        cursor: 'pointer',
-                        transition: 'all 200ms ease',
-                    }}
-                        onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(148, 163, 184, 0.12)'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(148, 163, 184, 0.06)'; }}
-                    >
-                        <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#E2E8F0' }}>أحمد العتيبي</div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748B' }}>مدير النظام</div>
-                        </div>
-                        <div style={{
-                            width: '34px',
-                            height: '34px',
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #6366F1, #06B6D4)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                        }}>
-                            أ
-                        </div>
-                    </div>
-                )}
-            </div>
-        </header>
-    );
-};
-
-const MainLayout: React.FC = () => {
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const { theme, toggleTheme } = useTheme();
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -158,22 +17,175 @@ const MainLayout: React.FC = () => {
     return (
         <div style={{ display: 'flex', minHeight: '100vh' }}>
             <Sidebar />
-            <main style={{
+
+            <div style={{
                 flex: 1,
-                marginRight: isMobile ? '0' : '280px',
-                backgroundColor: 'transparent',
-                minHeight: '100vh',
-                display: 'flex',
-                flexDirection: 'column'
+                marginRight: isMobile ? 0 : 'var(--sidebar-width)',
+                transition: 'margin-right 0.3s ease',
             }}>
-                <Header />
-                <div className="container" style={{
-                    flex: 1,
-                    padding: isMobile ? '20px 16px 40px' : '28px 36px 40px',
+                {/* Header */}
+                <header style={{
+                    height: isMobile ? '60px' : 'var(--header-height)',
+                    background: 'var(--bg-header)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: isMobile ? '0 60px 0 16px' : '0 32px',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 900,
+                }}>
+                    {/* Search */}
+                    {!isMobile && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            background: 'var(--bg-hover)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '8px 14px',
+                            width: '300px',
+                            transition: 'all 200ms ease',
+                        }}>
+                            <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                            <input
+                                type="text"
+                                placeholder="بحث سريع..."
+                                style={{
+                                    border: 'none',
+                                    outline: 'none',
+                                    width: '100%',
+                                    background: 'none',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.88rem',
+                                    fontFamily: 'inherit',
+                                    padding: 0,
+                                }}
+                            />
+                            <kbd style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--text-muted)',
+                                fontSize: '0.7rem',
+                                fontFamily: 'var(--font-en)',
+                            }}>
+                                <Command size={10} />K
+                            </kbd>
+                        </div>
+                    )}
+
+                    {isMobile && <div />}
+
+                    {/* Right actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {/* Theme Toggle */}
+                        <button
+                            onClick={toggleTheme}
+                            title={theme === 'light' ? 'الوضع الداكن' : 'الوضع الفاتح'}
+                            style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 200ms ease',
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.background = 'var(--bg-hover)';
+                                e.currentTarget.style.borderColor = 'var(--border-hover)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'var(--bg-card)';
+                                e.currentTarget.style.borderColor = 'var(--border)';
+                            }}
+                        >
+                            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                        </button>
+
+                        {/* Notifications */}
+                        <button style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-card)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                            transition: 'all 200ms ease',
+                        }}>
+                            <Bell size={18} />
+                            <span style={{
+                                position: 'absolute',
+                                top: '8px',
+                                left: '8px',
+                                width: '8px',
+                                height: '8px',
+                                background: 'var(--danger)',
+                                borderRadius: '50%',
+                                border: '2px solid var(--bg-header)',
+                            }} />
+                        </button>
+
+                        {/* User */}
+                        {!isMobile && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '6px 14px 6px 6px',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-card)',
+                                cursor: 'pointer',
+                                transition: 'all 200ms ease',
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>أحمد</div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>مدير</div>
+                                </div>
+                                <div style={{
+                                    width: '34px',
+                                    height: '34px',
+                                    borderRadius: '10px',
+                                    background: 'var(--primary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                }}>أ</div>
+                            </div>
+                        )}
+                    </div>
+                </header>
+
+                {/* Main Content */}
+                <main style={{
+                    padding: isMobile ? '16px' : '28px 32px',
+                    minHeight: `calc(100vh - var(--header-height))`,
                 }}>
                     <Outlet />
-                </div>
-            </main>
+                </main>
+            </div>
         </div>
     );
 };

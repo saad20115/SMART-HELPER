@@ -350,13 +350,13 @@ const Settings = () => {
                                 </div>
 
                                 {loading && (
-                                    <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                                         جاري التحميل...
                                     </div>
                                 )}
 
                                 {error && (
-                                    <div style={{ padding: '20px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#F87171', borderRadius: '10px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                    <div style={{ padding: '20px', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: '10px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                                         {error}
                                     </div>
                                 )}
@@ -373,7 +373,7 @@ const Settings = () => {
                                             <tbody>
                                                 {currentOrgData.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
+                                                        <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                                                             لا توجد بيانات. يمكنك إضافة عنصر جديد.
                                                         </td>
                                                     </tr>
