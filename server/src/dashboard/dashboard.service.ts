@@ -115,7 +115,7 @@ export class DashboardService {
     });
 
     totalLeaveCompensation = employeesWithLeave.reduce((sum, emp) => {
-      const balance = emp.leaveBalances[0]?.calculatedRemainingDays || 0;
+      const balance = Number(emp.leaveBalances[0]?.calculatedRemainingDays || 0);
       if (balance > 0) {
         const dailyWage = Number(emp.totalSalary || 0) / 30;
         return sum + (balance * dailyWage);

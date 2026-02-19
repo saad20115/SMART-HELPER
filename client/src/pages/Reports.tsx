@@ -42,8 +42,30 @@ interface AggregatedData {
         classification: string | null;
         jobTitle: string;
     }[];
-    branchBreakdown: { branch: string; employeeCount: number; totalEntitlements: number }[];
-    jobTitleBreakdown: { jobTitle: string; employeeCount: number; totalEntitlements: number }[];
+    branchBreakdown: {
+        branch: string;
+        employeeCount: number;
+        totalEntitlements: number;
+        totalLeaveCompensation: number;
+    }[];
+    jobTitleBreakdown: {
+        jobTitle: string;
+        employeeCount: number;
+        totalEntitlements: number;
+        totalLeaveCompensation: number;
+    }[];
+    departmentBreakdown: {
+        department: string;
+        employeeCount: number;
+        totalEntitlements: number;
+        totalLeaveCompensation: number;
+    }[];
+    classificationBreakdown: {
+        classification: string;
+        employeeCount: number;
+        totalEntitlements: number;
+        totalLeaveCompensation: number;
+    }[];
 }
 
 const COLORS = ['#2E7D32', '#1976D2', '#FF9800', '#DC3545', '#6610F2', '#00BCD4', '#E91E63', '#4CAF50'];
