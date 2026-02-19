@@ -350,13 +350,13 @@ const Settings = () => {
                                 </div>
 
                                 {loading && (
-                                    <div style={{ padding: '40px', textAlign: 'center', color: '#6C757D' }}>
+                                    <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                                         جاري التحميل...
                                     </div>
                                 )}
 
                                 {error && (
-                                    <div style={{ padding: '20px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', marginBottom: '16px' }}>
+                                    <div style={{ padding: '20px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#F87171', borderRadius: '10px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                                         {error}
                                     </div>
                                 )}
@@ -373,7 +373,7 @@ const Settings = () => {
                                             <tbody>
                                                 {currentOrgData.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#6C757D' }}>
+                                                        <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
                                                             لا توجد بيانات. يمكنك إضافة عنصر جديد.
                                                         </td>
                                                     </tr>
@@ -459,46 +459,7 @@ const Settings = () => {
                 </div>
             )}
 
-            <style>{`
-                .modal-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: rgba(0, 0, 0, 0.5);
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    z-index: 1000;
-                    animation: fadeIn 0.2s;
-                }
-                .modal-content {
-                    background-color: white;
-                    border-radius: 8px;
-                    width: 100%;
-                    max-width: 400px;
-                    padding: 24px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    animation: slideUp 0.3s;
-                }
-                .modal-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 16px;
-                }
-                .modal-footer {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 12px;
-                    margin-top: 24px;
-                }
-                @keyframes slideUp {
-                    from { transform: translateY(20px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-            `}</style>
+            {/* Styles moved to Settings.css */}
         </div>
     );
 };
