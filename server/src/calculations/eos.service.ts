@@ -249,12 +249,12 @@ export class EosCalculationService {
     let terminatedCount = 0;
 
     // Branch, job title, department, and classification breakdown maps
-    const branchMap = new Map<string, { count: number; total: number }>();
-    const jobTitleMap = new Map<string, { count: number; total: number }>();
-    const departmentMap = new Map<string, { count: number; total: number }>();
+    const branchMap = new Map<string, { count: number; total: number; totalLeave: number }>();
+    const jobTitleMap = new Map<string, { count: number; total: number; totalLeave: number }>();
+    const departmentMap = new Map<string, { count: number; total: number; totalLeave: number }>();
     const classificationMap = new Map<
       string,
-      { count: number; total: number }
+      { count: number; total: number; totalLeave: number }
     >();
 
     const calculationDate = query.fiscalYearEnd
