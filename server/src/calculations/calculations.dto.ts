@@ -8,6 +8,10 @@ export enum EmployeeStatus {
 
 export class AggregatedCalculationsQueryDto {
   @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsOptional()
   @IsDateString()
   fiscalYearEnd?: string; // e.g., "2026-12-31"
 
@@ -112,6 +116,7 @@ export interface AggregatedCalculationsResponseDto {
   departmentBreakdown: DepartmentBreakdownDto[];
   classificationBreakdown: ClassificationBreakdownDto[];
   filters: {
+    companyId?: string;
     fiscalYearEnd?: string;
     branch?: string;
     department?: string;

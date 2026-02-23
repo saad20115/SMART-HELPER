@@ -183,6 +183,11 @@ export class EosCalculationService {
     // Build where clause based on filters
     const where: any = {};
 
+    // Filter by company
+    if (query.companyId) {
+      where.companyId = query.companyId;
+    }
+
     // Filter by fiscal year end (employees hired before this date)
     if (query.fiscalYearEnd) {
       const filterDate = new Date(query.fiscalYearEnd);
@@ -489,6 +494,7 @@ export class EosCalculationService {
         }),
       ),
       filters: {
+        companyId: query.companyId,
         fiscalYearEnd: query.fiscalYearEnd,
         branch: query.branch,
         jobTitle: query.jobTitle,

@@ -95,8 +95,10 @@ const Dashboard: React.FC = () => {
             link: '/aggregated-calculations',
         },
         {
-            title: 'إجمالي مكافآت نهاية الخدمة',
-            value: formatCurrency(aggregatedData?.totalNetEOS),
+            title: 'صافي نهاية الخدمة',
+            value: formatCurrency(
+                (aggregatedData?.totalFinalPayable ?? 0) - (aggregatedData?.totalLeaveCompensation ?? 0)
+            ),
             sub: 'ر.س',
             accentColor: '#D97706',
             icon: TrendingUp,
