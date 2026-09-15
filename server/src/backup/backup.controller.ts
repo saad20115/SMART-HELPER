@@ -53,7 +53,13 @@ export class BackupController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './backups',
+        destination: (req, file, cb) => {
+          const dir = join(process.cwd(), 'backups');
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          cb(null, dir);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix =
             Date.now() + '-' + Math.round(Math.random() * 1e9);
