@@ -423,11 +423,7 @@ export const backupApi = {
     uploadBackup: async (file: File): Promise<any> => {
         const formData = new FormData();
         formData.append('file', file);
-        const response = await apiClient.post('/backup/upload', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+        const response = await apiClient.post('/backup/upload', formData);
         return response.data;
     },
 
