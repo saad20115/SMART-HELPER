@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, UserX, AlertCircle, RefreshCw, User, Calendar, CheckCircle } from 'lucide-react';
 import { companiesApi, calculationsApi, settlementApi } from '../api/settingsService';
 import type { Company } from '../api/settingsService';

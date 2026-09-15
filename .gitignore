@@ -48,6 +48,3 @@ Thumbs.db
 # Excel data files
 *.xlsx
 ~$*
-
-# Prisma migration lock
-/server/prisma/migrations/migration_lock.toml

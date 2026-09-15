@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     Calendar, Search, RefreshCw, User, Clock,
     Filter, Plus, Trash2
@@ -115,9 +115,9 @@ const LeaveHistory = () => {
     );
 
     const txShown   = history?.transactions ?? [];
-    const totalUsed = txShown.filter(t => t.type==="USAGE").reduce((s,t) => s + Math.abs(t.days), 0);
-    const totalAdj  = txShown.filter(t => t.type==="ADJUSTMENT").reduce((s,t) => s + t.days, 0);
-    const totalAcc  = txShown.filter(t => t.type==="ACCRUAL").reduce((s,t) => s + t.days, 0);
+    const totalUsed = txShown.filter((t: any) => t.type==="USAGE").reduce((s: number, t: any) => s + Math.abs(t.days), 0);
+    const totalAdj  = txShown.filter((t: any) => t.type==="ADJUSTMENT").reduce((s: number, t: any) => s + t.days, 0);
+    const totalAcc  = txShown.filter((t: any) => t.type==="ACCRUAL").reduce((s: number, t: any) => s + t.days, 0);
 
     const sel = { padding:"10px 12px", borderRadius:"8px", border:"1px solid var(--border)", background:"var(--bg-input,#fff)", color:"var(--text-primary)", width:"100%", fontSize:"0.9rem" };
     const lbl = { display:"block", marginBottom:"6px", fontSize:"0.85rem", fontWeight:"600", color:"var(--text-secondary)" };
@@ -304,8 +304,8 @@ const LeaveHistory = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {txShown.map((tx, idx) => {
-                                                    const cfg = TX_CONFIG[tx.type] || { label:tx.type, color:"#666", bg:"#f5f5f5" };
+                                                {txShown.map((tx: any, idx: number) => {
+                                                    const cfg = (TX_CONFIG as Record<string, { label: string; color: string; bg: string }>)[tx.type] || { label:tx.type, color:"#666", bg:"#f5f5f5" };
                                                     const isNeg = tx.days < 0;
                                                     return (
                                                         <tr key={tx.id} style={{ borderBottom:"1px solid var(--border)", background: idx%2===0?"transparent":"var(--bg-hover,#FAFAFA)" }}>
