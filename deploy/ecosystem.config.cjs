@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   apps: [
     {
       name: 'smart-hr-backend',
@@ -10,7 +10,7 @@
       max_memory_restart: '800M',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
+        PORT: 3200,
       },
     },
   ],
