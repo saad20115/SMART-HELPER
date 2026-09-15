@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Users, Calculator, Settings, LogOut, FileText, Calendar, DollarSign, Database, Menu, X, Sparkles } from 'lucide-react';
+import { Home, Users, Calculator, Settings, LogOut, FileText, Calendar, ClipboardList, DollarSign, Database, Menu, X, Sparkles, UserX } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -22,15 +22,17 @@ const Sidebar: React.FC = () => {
     }, [location.pathname, isMobile]);
 
     const menuItems = [
-        { icon: Home, label: 'لوحة التحكم', path: '/' },
-        { icon: Users, label: 'الموظفين', path: '/employees' },
-        { icon: Calculator, label: 'حساب المستحقات', path: '/calculations' },
-        { icon: Calendar, label: 'إدارة الإجازات', path: '/leave-management' },
-        { icon: FileText, label: 'الحاسبة المجمعة', path: '/aggregated-calculations' },
-        { icon: DollarSign, label: 'المبالغ المعلقة', path: '/pending-amounts' },
-        { icon: FileText, label: 'التقارير', path: '/reports' },
-        { icon: Settings, label: 'الإعدادات', path: '/settings' },
-        { icon: Database, label: 'النسخ الاحتياطي', path: '/backup-restore' },
+        { icon: Home,          label: 'لوحة التحكم',    path: '/' },
+        { icon: Users,         label: 'الموظفين',       path: '/employees' },
+        { icon: Calculator,    label: 'حساب المستحقات', path: '/calculations' },
+        { icon: Calendar,      label: 'إدارة الإجازات', path: '/leave-management' },
+        { icon: ClipboardList, label: 'سجل الإجازات',   path: '/leave-history' },
+        { icon: FileText,      label: 'الحاسبة المجمعة',path: '/aggregated-calculations' },
+        { icon: UserX,         label: 'تصفية موظف',     path: '/employee-settlement' },
+        { icon: DollarSign,    label: 'المبالغ المعلقة',path: '/pending-amounts' },
+        { icon: FileText,      label: 'التقارير',       path: '/reports' },
+        { icon: Settings,      label: 'الإعدادات',      path: '/settings' },
+        { icon: Database,      label: 'النسخ الاحتياطي',path: '/backup-restore' },
     ];
 
     return (

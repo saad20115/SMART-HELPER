@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Plus, Minus, RefreshCw, Filter, Search } from 'lucide-react';
+import { Calendar, Plus, Minus, RefreshCw, Filter, Search, Edit2 } from 'lucide-react';
 import { leaveApi, settingsApi, companiesApi } from '../api/settingsService';
 import type { LeaveBalance, Company } from '../api/settingsService';
 
@@ -18,6 +18,14 @@ const LeaveManagement: React.FC = () => {
     const [adjustmentDays, setAdjustmentDays] = useState<number | ''>('');
     const [adjustmentReason, setAdjustmentReason] = useState('');
     const [adjustmentType, setAdjustmentType] = useState<'ADD' | 'DEDUCT'>('ADD');
+
+    // Quick Edit Modal State
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editEmployee, setEditEmployee] = useState<LeaveBalance | null>(null);
+    const [editEntitled, setEditEntitled] = useState<number>(0);
+    const [editUsed, setEditUsed] = useState<number>(0);
+    const [editRemaining, setEditRemaining] = useState<number>(0);
+    const [editReason, setEditReason] = useState('');
 
     useEffect(() => {
         loadInitialData();
@@ -107,6 +115,32 @@ const LeaveManagement: React.FC = () => {
         const matchesBranch = selectedBranch ? b.branch === selectedBranch : true;
         return matchesSearch && matchesBranch;
     });
+
+    const handleOpenEdit = (item: LeaveBalance) => {
+        setEditEmployee(item);
+        setEditEntitled(Number(item.annualEntitledDays));
+        setEditUsed(Number(item.annualUsedDays));
+        setEditRemaining(Number(item.calculatedRemainingDays));
+        setEditReason('');
+        setShowEditModal(true);
+    };
+
+    const handleSubmitEdit = async () => {
+        if (!editEmployee) return;
+        try {
+            await leaveApi.directUpdateBalance(editEmployee.employeeId, {
+                annualEntitledDays: editEntitled,
+                annualUsedDays: editUsed,
+                calculatedRemainingDays: editRemaining,
+                reason: editReason || 'تصحيح يدوي',
+            });
+            setShowEditModal(false);
+            fetchData();
+        } catch (error) {
+            console.error("Edit failed", error);
+            alert("فشلت عملية التعديل");
+        }
+    };
 
     return (
         <div style={{ padding: '24px' }}>
@@ -228,6 +262,13 @@ const LeaveManagement: React.FC = () => {
                                             >
                                                 <Calendar size={16} />
                                             </button>
+                                            <button
+                                                onClick={() => handleOpenEdit(item)}
+                                                title="تصحيح سريع للأرقام"
+                                                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #E9ECEF', backgroundColor: '#fff', cursor: 'pointer', color: '#F59E0B' }}
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -307,6 +348,78 @@ const LeaveManagement: React.FC = () => {
                             <button
                                 className="btn"
                                 onClick={() => setShowModal(false)}
+                                style={{ flex: 1, backgroundColor: '#F8F9FA', color: '#495057' }}
+                            >
+                                إلغاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Edit Modal */}
+            {showEditModal && editEmployee && (
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '32px', width: '480px', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <h3 style={{ marginBottom: '8px', color: '#111' }}>✏️ تصحيح سريع</h3>
+                        <p style={{ color: '#6C757D', marginBottom: '24px', fontSize: '0.9rem' }}>
+                            {editEmployee.employeeName}
+                        </p>
+
+                        <div style={{ display: 'grid', gap: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#495057' }}>الاستحقاق السنوي (يوم)</label>
+                                <input
+                                    type="number"
+                                    value={editEntitled}
+                                    onChange={(e) => setEditEntitled(Number(e.target.value))}
+                                    style={{ width: '100%', padding: '10px', border: '1px solid #E9ECEF', borderRadius: '8px' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#495057' }}>الأيام المستخدمة</label>
+                                <input
+                                    type="number"
+                                    value={editUsed}
+                                    onChange={(e) => setEditUsed(Number(e.target.value))}
+                                    style={{ width: '100%', padding: '10px', border: '1px solid #E9ECEF', borderRadius: '8px' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#495057' }}>الرصيد المتبقي (يوم)</label>
+                                <input
+                                    type="number"
+                                    value={editRemaining}
+                                    onChange={(e) => setEditRemaining(Number(e.target.value))}
+                                    style={{ width: '100%', padding: '10px', border: '1px solid #E9ECEF', borderRadius: '8px' }}
+                                />
+                                <div style={{ fontSize: '0.8rem', color: '#6C757D', marginTop: '4px' }}>
+                                    القيمة = {(Math.max(0, editRemaining) * Number(editEmployee.leaveValue) / Math.max(1, Number(editEmployee.calculatedRemainingDays))).toLocaleString(undefined, { maximumFractionDigits: 0 })} ر.س
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#495057' }}>سبب التعديل</label>
+                                <input
+                                    type="text"
+                                    value={editReason}
+                                    onChange={(e) => setEditReason(e.target.value)}
+                                    placeholder="تصحيح من ملف الإكسيل..."
+                                    style={{ width: '100%', padding: '10px', border: '1px solid #E9ECEF', borderRadius: '8px' }}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleSubmitEdit}
+                                style={{ flex: 1, backgroundColor: '#F59E0B', borderColor: '#F59E0B' }}
+                            >
+                                حفظ التصحيح
+                            </button>
+                            <button
+                                className="btn"
+                                onClick={() => setShowEditModal(false)}
                                 style={{ flex: 1, backgroundColor: '#F8F9FA', color: '#495057' }}
                             >
                                 إلغاء

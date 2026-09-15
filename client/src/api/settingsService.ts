@@ -271,6 +271,40 @@ export interface LeaveBalance {
     lastCalculatedAt: string;
 }
 
+export interface LeaveTransaction {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    employeeNumber: string;
+    type: 'ACCRUAL' | 'USAGE' | 'ADJUSTMENT' | 'ENCASHMENT';
+    days: number;
+    reason: string | null;
+    performedBy: string | null;
+    createdAt: string;
+    balanceAfter: number | null;
+}
+
+export interface EmployeeLeaveHistory {
+    employeeId: string;
+    employeeName: string;
+    employeeNumber: string;
+    jobTitle: string;
+    branch: string | null;
+    hireDate: string;
+    annualEntitledDays: number;
+    annualUsedDays: number;
+    calculatedRemainingDays: number;
+    leaveValue: number;
+    transactions: LeaveTransaction[];
+}
+
+export interface CompanyHistoryEmployee {
+    id: string;
+    fullName: string;
+    employeeNumber: string;
+    transactionCount: number;
+}
+
 export const leaveApi = {
     getBalances: async (companyId: string): Promise<LeaveBalance[]> => {
         const response = await apiClient.get(`/leave/balances/${companyId}`);
@@ -285,7 +319,44 @@ export const leaveApi = {
     recalculateAccruals: async (employeeId: string): Promise<any> => {
         const response = await apiClient.post(`/leave/recalculate/${employeeId}`);
         return response.data;
-    }
+    },
+
+    getEmployeeHistory: async (employeeId: string, month?: number, year?: number): Promise<EmployeeLeaveHistory> => {
+        const params: Record<string, string> = {};
+        if (month) params.month = String(month);
+        if (year) params.year = String(year);
+        const response = await apiClient.get(`/leave/history/${employeeId}`, { params });
+        return response.data;
+    },
+
+    getCompanyHistory: async (companyId: string, month?: number, year?: number): Promise<{ employees: CompanyHistoryEmployee[] }> => {
+        const params: Record<string, string> = {};
+        if (month) params.month = String(month);
+        if (year) params.year = String(year);
+        const response = await apiClient.get(`/leave/history/company/${companyId}`, { params });
+        return response.data;
+    },
+
+    directUpdateBalance: async (employeeId: string, data: {
+        annualEntitledDays?: number;
+        annualUsedDays?: number;
+        calculatedRemainingDays?: number;
+        leaveValue?: number;
+        reason?: string;
+    }): Promise<any> => {
+        const response = await apiClient.put(`/leave/balance/${employeeId}`, data);
+        return response.data;
+    },
+
+    addTransaction: async (data: { employeeId: string; type: string; days: number; reason?: string }): Promise<any> => {
+        const response = await apiClient.post('/leave/transaction', data);
+        return response.data;
+    },
+
+    deleteTransaction: async (id: string): Promise<any> => {
+        const response = await apiClient.delete(`/leave/transaction/${id}`);
+        return response.data;
+    },
 };
 
 export interface Deduction {
@@ -363,4 +434,23 @@ export const backupApi = {
     getDownloadUrl: (filename: string) => {
         return `${apiClient.defaults.baseURL}/backup/${filename}/download`;
     }
+};
+
+export const settlementApi = {
+    getEmployeePreview: async (employeeId: string, endDate: string, terminationType: string) => {
+        const response = await apiClient.get(`/calculations/eos/settlement-preview`, { params: { employeeId, endDate, terminationType } });
+        return response.data;
+    },
+    executeSettlement: async (data: { employeeId: string; endDate: string; terminationType: string; notes?: string; extraDeductions?: number; extraBonuses?: number }) => {
+        const response = await apiClient.post('/calculations/eos/terminate', data);
+        return response.data;
+    },
+    getSettlements: async () => {
+        const response = await apiClient.get('/calculations/eos/settlements');
+        return response.data;
+    },
+    reactivate: async (employeeId: string) => {
+        const response = await apiClient.post('/calculations/eos/reactivate', { employeeId });
+        return response.data;
+    },
 };

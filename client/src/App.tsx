@@ -7,8 +7,10 @@ import Calculations from './pages/Calculations';
 import AggregatedCalculations from './pages/AggregatedCalculations';
 import Reports from './pages/Reports';
 import LeaveManagement from './pages/LeaveManagement';
+import LeaveHistory from './pages/LeaveHistory';
 import Settings from './pages/Settings';
 import PendingAmounts from './pages/PendingAmounts';
+import EmployeeSettlement from './pages/EmployeeSettlement';
 import BackupRestore from './pages/BackupRestore';
 
 function App() {
@@ -23,6 +25,8 @@ function App() {
             <Route path="aggregated-calculations" element={<AggregatedCalculations />} />
             <Route path="reports" element={<Reports />} />
             <Route path="leave-management" element={<LeaveManagement />} />
+            <Route path="leave-history" element={<LeaveHistory />} />
+            <Route path="employee-settlement" element={<EmployeeSettlement />} />
             <Route path="settings" element={<Settings />} />
             <Route path="pending-amounts" element={<PendingAmounts />} />
             <Route path="backup-restore" element={<BackupRestore />} />

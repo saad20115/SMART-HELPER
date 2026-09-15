@@ -147,9 +147,30 @@ model Employee {
   leaveTransactions LeaveTransaction[]
   deductions      Deduction[]
   eosCalculations EosCalculation[]
+  settlements     SettlementRecord[]
 
   @@unique([companyId, nationalId])
   @@unique([companyId, employeeNumber])
+}
+
+model SettlementRecord {
+  id              String   @id @default(uuid())
+  employeeId      String
+  settlementDate  DateTime
+  grossEOS        Decimal
+  netEOS          Decimal
+  leaveBalanceDays Decimal
+  leaveValue      Decimal
+  totalDeductions Decimal
+  finalPayable    Decimal
+  terminationType String
+  serviceYears    Decimal
+  basicSalary     Decimal
+  totalSalary     Decimal
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 model LeaveBalance {

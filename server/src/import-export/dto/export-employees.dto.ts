@@ -14,8 +14,6 @@ export class ExportEmployeesDto {
 
   @IsOptional()
   @IsString()
-  @IsOptional()
-  @IsString()
   jobTitle?: string;
 
   @IsString()

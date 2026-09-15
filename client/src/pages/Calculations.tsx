@@ -11,6 +11,7 @@ const Calculations: React.FC = () => {
     // EOS State
     const [eosResult, setEosResult] = useState<any>(null);
     const [terminationType, setTerminationType] = useState('RESIGNATION');
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Vacation State
     const [vacationResult, setVacationResult] = useState<any>(null);
@@ -152,7 +153,7 @@ const Calculations: React.FC = () => {
 
                             <div className="form-group">
                                 <label>تاريخ نهاية العمل</label>
-                                <input type="date" style={{ backgroundColor: '#F8F9FA', width: '100%', padding: '12px', border: '1px solid #E9ECEF', borderRadius: '8px' }} />
+                                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ backgroundColor: '#F8F9FA', width: '100%', padding: '12px', border: '1px solid #E9ECEF', borderRadius: '8px' }} />
                             </div>
                         </>
                     )}

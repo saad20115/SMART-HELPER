@@ -18,3 +18,30 @@ export class LeaveBalanceResponseDto {
   leaveValue: number;
   lastCalculatedAt: string;
 }
+
+export class LeaveTransactionDto {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  type: string;
+  days: number;
+  reason: string | null;
+  performedBy: string | null;
+  createdAt: string;
+  balanceAfter: number | null;
+}
+
+export class EmployeeLeaveHistoryDto {
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  jobTitle: string;
+  branch: string | null;
+  hireDate: string;
+  annualEntitledDays: number;
+  annualUsedDays: number;
+  calculatedRemainingDays: number;
+  leaveValue: number;
+  transactions: LeaveTransactionDto[];
+}

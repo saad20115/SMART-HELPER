@@ -34,6 +34,10 @@ export class AggregatedCalculationsQueryDto {
   @IsOptional()
   @IsEnum(EmployeeStatus)
   status?: EmployeeStatus;
+
+  @IsOptional()
+  @IsDateString()
+  snapshotDate?: string; // e.g., "2024-12-31" — calculate as-of this date
 }
 
 export interface EmployeeEntitlementDto {

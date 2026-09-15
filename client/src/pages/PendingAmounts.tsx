@@ -9,7 +9,7 @@ const PendingAmounts: React.FC = () => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('PENDING');
+    const [statusFilter, setStatusFilter] = useState<string>('');
     const [typeFilter, setTypeFilter] = useState<string>('');
 
     // Modal State

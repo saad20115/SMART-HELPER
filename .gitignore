@@ -36,3 +36,18 @@ Thumbs.db
 .vercel
 .cache/
 .turbo/
+
+# Backups (contain sensitive employee data)
+/server/backups/
+
+# Utility/maintenance scripts
+/server/*.cjs
+/server/scripts/
+/inspect_excel.cjs
+
+# Excel data files
+*.xlsx
+~$*
+
+# Prisma migration lock
+/server/prisma/migrations/migration_lock.toml

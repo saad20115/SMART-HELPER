@@ -37,6 +37,7 @@ export class BackupService {
       leaveTransactions: await this.prisma.leaveTransaction.findMany(),
       deductions: await this.prisma.deduction.findMany(),
       eosCalculations: await this.prisma.eosCalculation.findMany(),
+      settlementRecords: await this.prisma.settlementRecord.findMany(),
       importLogs: await this.prisma.importLog.findMany(),
       importErrors: await this.prisma.importError.findMany(),
       exportLogs: await this.prisma.exportLog.findMany(),
@@ -108,6 +109,7 @@ export class BackupService {
       await tx.exportLog.deleteMany();
 
       await tx.eosCalculation.deleteMany();
+      await tx.settlementRecord.deleteMany();
       await tx.deduction.deleteMany();
       await tx.leaveTransaction.deleteMany();
       await tx.leaveBalance.deleteMany();
@@ -144,6 +146,8 @@ export class BackupService {
         await tx.deduction.createMany({ data: data.deductions });
       if (data.eosCalculations?.length)
         await tx.eosCalculation.createMany({ data: data.eosCalculations });
+      if (data.settlementRecords?.length)
+        await tx.settlementRecord.createMany({ data: data.settlementRecords });
 
       if (data.exportLogs?.length)
         await tx.exportLog.createMany({ data: data.exportLogs });

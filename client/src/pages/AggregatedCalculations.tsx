@@ -59,7 +59,8 @@ const AggregatedCalculations: React.FC = () => {
     const [department, setDepartment] = useState('');
     const [classification, setClassification] = useState('');
     const [jobTitle, setJobTitle] = useState('');
-    const [status, setStatus] = useState('ALL');
+    const [status, setStatus] = useState('ACTIVE');
+    const [snapshotDate, setSnapshotDate] = useState('');
 
     // Table state
     const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +79,7 @@ const AggregatedCalculations: React.FC = () => {
             if (classification) params.classification = classification;
             if (jobTitle) params.jobTitle = jobTitle;
             if (status) params.status = status;
+            if (snapshotDate) params.snapshotDate = snapshotDate;
 
             const result = await calculationsApi.getAggregated(params);
             setData(result);
@@ -86,7 +88,7 @@ const AggregatedCalculations: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [companyId, fiscalYearEnd, branch, department, classification, jobTitle, status]);
+    }, [companyId, fiscalYearEnd, branch, department, classification, jobTitle, status, snapshotDate]);
 
     useEffect(() => {
         const loadCompanies = async () => {
@@ -164,7 +166,7 @@ const AggregatedCalculations: React.FC = () => {
                         disabled={loading}
                         style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
-                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        <RefreshCw size={18} className={loading ? 'spin' : ''} />
                         <span>تحديث البيانات</span>
                     </button>
                     <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -174,6 +176,13 @@ const AggregatedCalculations: React.FC = () => {
                 </div>
             </div>
 
+            {/* Banner for historical data */}
+            {snapshotDate && (
+                <div style={{ padding: '12px 16px', backgroundColor: '#FFF3E0', color: '#E65100', borderRadius: '8px', marginBottom: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #FFE0B2' }}>
+                    ⏰ عرض الموقف التاريخي بتاريخ: {snapshotDate}
+                </div>
+            )}
+
             {/* Filters */}
             <div className="card" style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -181,6 +190,35 @@ const AggregatedCalculations: React.FC = () => {
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0, color: 'var(--text-primary)' }}>الفلاتر</h3>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-secondary)' }}>تاريخ الموقف (Snapshot)</label>
+                        <select
+                            title="تاريخ الموقف"
+                            value={snapshotDate}
+                            onChange={(e) => setSnapshotDate(e.target.value)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                        >
+                            <option value="">الموقف الحالي</option>
+                            <option value="2025-12-31">نهاية 2025</option>
+                            <option value="2024-12-31">نهاية 2024</option>
+                            <option value="2023-12-31">نهاية 2023</option>
+                            <option value="2022-12-31">نهاية 2022</option>
+                            <option value="2021-12-31">نهاية 2021</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-secondary)' }}>حالة الموظف</label>
+                        <select
+                            title="حالة الموظف"
+                            value={status}
+                            onChange={(e) => setStatus(e.target.value)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                        >
+                            <option value="ACTIVE">نشط فقط</option>
+                            <option value="TERMINATED">منتهي الخدمة فقط</option>
+                            <option value="ALL">الكل</option>
+                        </select>
+                    </div>
                     <div>
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-secondary)' }}>الشركة</label>
                         <select
@@ -250,19 +288,6 @@ const AggregatedCalculations: React.FC = () => {
                             {Array.from(new Set((data?.employees || []).map(e => e.classification).filter(Boolean))).map(c => <option key={c} value={c!}>{c}</option>)}
                         </select>
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-secondary)' }}>حالة الموظف</label>
-                        <select
-                            title="تصفية حسب الحالة"
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                        >
-                            <option value="ALL">الكل</option>
-                            <option value="ACTIVE">نشط</option>
-                            <option value="TERMINATED">منتهي الخدمة</option>
-                        </select>
-                    </div>
                 </div>
                 <button
                     onClick={fetchData}
@@ -305,7 +330,7 @@ const AggregatedCalculations: React.FC = () => {
                         <div className="card" style={{ borderTop: '4px solid #fd7e14' }}>
                             <div style={{ fontSize: '0.9rem', color: '#6C757D', marginBottom: '8px' }}>صافي نهاية الخدمة</div>
                             <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fd7e14' }}>
-                                {formatCurrency((data.summary.totalFinalPayable ?? 0) - (data.summary.totalLeaveCompensation ?? 0))} ر.س
+                                {formatCurrency(data.summary.totalNetEOS)} ر.س
                             </div>
                         </div>
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AdjustLeaveBalanceDto, LeaveBalanceResponseDto } from './leave.dto';
+import { AdjustLeaveBalanceDto, LeaveBalanceResponseDto, EmployeeLeaveHistoryDto } from './leave.dto';
 import { LeaveTransactionType } from '@prisma/client';
 
 @Injectable()
@@ -240,5 +240,273 @@ export class LeaveService {
     } else {
       return 5 * 21 + (years - 5) * 30;
     }
+  }
+
+  /**
+   * Direct update of leave balance fields — for quick manual correction
+   */
+  async directUpdateBalance(
+    employeeId: string,
+    data: {
+      annualEntitledDays?: number;
+      annualUsedDays?: number;
+      calculatedRemainingDays?: number;
+      leaveValue?: number;
+      reason?: string;
+    },
+  ) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { leaveBalances: true },
+    });
+
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const balance = employee.leaveBalances[0];
+    if (!balance) throw new NotFoundException('Leave balance not found');
+
+    const updateData: any = { lastCalculatedAt: new Date() };
+
+    if (data.annualEntitledDays !== undefined)
+      updateData.annualEntitledDays = data.annualEntitledDays;
+    if (data.annualUsedDays !== undefined)
+      updateData.annualUsedDays = data.annualUsedDays;
+    if (data.calculatedRemainingDays !== undefined)
+      updateData.calculatedRemainingDays = data.calculatedRemainingDays;
+
+    // Auto-calculate leave value if remaining days changed
+    if (data.leaveValue !== undefined) {
+      updateData.leaveValue = data.leaveValue;
+    } else if (data.calculatedRemainingDays !== undefined) {
+      const dailyWage = Number(employee.totalSalary) / 30;
+      updateData.leaveValue = Math.max(0, data.calculatedRemainingDays) * dailyWage;
+    }
+
+    const updated = await this.prisma.leaveBalance.update({
+      where: { id: balance.id },
+      data: updateData,
+    });
+
+    // Log the correction as a transaction
+    if (data.reason) {
+      await this.prisma.leaveTransaction.create({
+        data: {
+          employeeId,
+          type: 'ADJUSTMENT',
+          days: 0,
+          reason: `تصحيح يدوي: ${data.reason}`,
+          performedBy: 'admin-correction',
+        },
+      });
+    }
+
+    return { success: true, balance: updated };
+  }
+
+  /**
+   * Add a new leave transaction and update the balance
+   */
+  async addTransaction(data: {
+    employeeId: string;
+    type: string;
+    days: number;
+    reason?: string;
+  }) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: data.employeeId },
+      include: { leaveBalances: true },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const tx = await this.prisma.leaveTransaction.create({
+      data: {
+        employeeId: data.employeeId,
+        type: data.type as any,
+        days: data.days,
+        reason: data.reason || '',
+        performedBy: 'admin',
+      },
+    });
+
+    // Update balance
+    const balance = employee.leaveBalances[0];
+    if (balance) {
+      const newRemaining = Number(balance.calculatedRemainingDays) + data.days;
+      const dailyWage = Number(employee.totalSalary) / 30;
+      const newUsed =
+        data.days < 0
+          ? Number(balance.annualUsedDays) + Math.abs(data.days)
+          : Number(balance.annualUsedDays);
+
+      await this.prisma.leaveBalance.update({
+        where: { id: balance.id },
+        data: {
+          calculatedRemainingDays: newRemaining,
+          leaveValue: Math.max(0, newRemaining) * dailyWage,
+          annualUsedDays: newUsed,
+          lastCalculatedAt: new Date(),
+        },
+      });
+    }
+
+    return { success: true, transaction: tx };
+  }
+
+  /**
+   * Delete a leave transaction and reverse its effect on the balance
+   */
+  async deleteTransaction(id: string) {
+    const tx = await this.prisma.leaveTransaction.findUnique({
+      where: { id },
+    });
+    if (!tx) throw new NotFoundException('Transaction not found');
+
+    // Reverse the effect on the balance
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: tx.employeeId },
+      include: { leaveBalances: true },
+    });
+
+    if (employee) {
+      const balance = employee.leaveBalances[0];
+      if (balance) {
+        const newRemaining =
+          Number(balance.calculatedRemainingDays) - Number(tx.days);
+        const dailyWage = Number(employee.totalSalary) / 30;
+        const newUsed =
+          Number(tx.days) < 0
+            ? Number(balance.annualUsedDays) - Math.abs(Number(tx.days))
+            : Number(balance.annualUsedDays);
+
+        await this.prisma.leaveBalance.update({
+          where: { id: balance.id },
+          data: {
+            calculatedRemainingDays: newRemaining,
+            leaveValue: Math.max(0, newRemaining) * dailyWage,
+            annualUsedDays: Math.max(0, newUsed),
+            lastCalculatedAt: new Date(),
+          },
+        });
+      }
+    }
+
+    await this.prisma.leaveTransaction.delete({ where: { id } });
+
+    return { success: true };
+  }
+
+  /**
+   * Get full leave history for a single employee with optional month/year filter
+   */
+  async getEmployeeHistory(
+    employeeId: string,
+    month?: number,
+    year?: number,
+  ): Promise<EmployeeLeaveHistoryDto> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        leaveBalances: true,
+        leaveTransactions: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    // Filter transactions by month/year if provided
+    let transactions = employee.leaveTransactions;
+    if (month && year) {
+      transactions = transactions.filter((tx) => {
+        const d = new Date(tx.createdAt);
+        return d.getMonth() + 1 === month && d.getFullYear() === year;
+      });
+    } else if (year) {
+      transactions = transactions.filter(
+        (tx) => new Date(tx.createdAt).getFullYear() === year,
+      );
+    }
+
+    const balance = employee.leaveBalances[0];
+
+    // Build running balance snapshot per transaction (newest first → reverse for running calc)
+    const allTx = [...employee.leaveTransactions].reverse(); // oldest first
+    let runningBalance = 0;
+    const balanceMap = new Map<string, number>();
+    for (const tx of allTx) {
+      runningBalance += Number(tx.days);
+      balanceMap.set(tx.id, Number(runningBalance.toFixed(2)));
+    }
+
+    const txDtos = transactions.map((tx) => ({
+      id: tx.id,
+      employeeId: tx.employeeId,
+      employeeName: employee.fullName,
+      employeeNumber: employee.employeeNumber,
+      type: tx.type,
+      days: Number(tx.days),
+      reason: tx.reason,
+      performedBy: tx.performedBy,
+      createdAt: tx.createdAt.toISOString(),
+      balanceAfter: balanceMap.get(tx.id) ?? null,
+    }));
+
+    return {
+      employeeId: employee.id,
+      employeeName: employee.fullName,
+      employeeNumber: employee.employeeNumber,
+      jobTitle: employee.jobTitle,
+      branch: employee.branch,
+      hireDate: employee.hireDate.toISOString(),
+      annualEntitledDays: balance ? Number(balance.annualEntitledDays) : 0,
+      annualUsedDays: balance ? Number(balance.annualUsedDays) : 0,
+      calculatedRemainingDays: balance
+        ? Number(balance.calculatedRemainingDays)
+        : 0,
+      leaveValue: balance ? Number(balance.leaveValue) : 0,
+      transactions: txDtos,
+    };
+  }
+
+  /**
+   * Get leave history for all employees in a company (summary list)
+   */
+  async getCompanyHistory(
+    companyId: string,
+    month?: number,
+    year?: number,
+  ): Promise<{ employees: { id: string; fullName: string; employeeNumber: string; transactionCount: number }[] }> {
+    // Date filter
+    const dateFilter: any = {};
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 1);
+      dateFilter.createdAt = { gte: startDate, lt: endDate };
+    } else if (year) {
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year + 1, 0, 1);
+      dateFilter.createdAt = { gte: startDate, lt: endDate };
+    }
+
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId, endDate: null },
+      include: {
+        leaveTransactions: {
+          where: Object.keys(dateFilter).length ? dateFilter : undefined,
+          select: { id: true },
+        },
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    return {
+      employees: employees.map((e) => ({
+        id: e.id,
+        fullName: e.fullName,
+        employeeNumber: e.employeeNumber,
+        transactionCount: e.leaveTransactions.length,
+      })),
+    };
   }
 }

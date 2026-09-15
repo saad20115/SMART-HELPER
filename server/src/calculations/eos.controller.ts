@@ -6,15 +6,46 @@ import { AggregatedCalculationsQueryDto } from './calculations.dto';
 export class EosController {
   constructor(private readonly eosService: EosCalculationService) { }
 
-  @Post(':employeeId') // /calculations/eos/:employeeId
-  async calculateEOS(
-    @Param('employeeId') employeeId: string,
-    @Body('terminationType') terminationType?: string,
+  // Static routes MUST come before parameterized routes
+  @Get('aggregated')
+  async getAggregatedCalculations(
+    @Query() query: AggregatedCalculationsQueryDto,
   ) {
-    return this.eosService.calculateEOS(employeeId, terminationType);
+    return this.eosService.calculateAggregatedEntitlements(query);
   }
 
-  @Post('vacation/:employeeId') // /calculations/eos/vacation/:employeeId
+  @Get('settlement-preview')
+  async getSettlementPreview(
+    @Query('employeeId') employeeId: string,
+    @Query('endDate') endDate: string,
+    @Query('terminationType') terminationType: string,
+  ) {
+    return this.eosService.getSettlementPreview(
+      employeeId,
+      endDate,
+      terminationType,
+    );
+  }
+
+  @Get('settlements')
+  async getSettlements() {
+    return this.eosService.getSettlements();
+  }
+
+  @Post('terminate')
+  async terminateEmployee(
+    @Body()
+    body: {
+      employeeId: string;
+      endDate: string;
+      terminationType: string;
+      notes?: string;
+    },
+  ) {
+    return this.eosService.terminateEmployee(body);
+  }
+
+  @Post('vacation/:employeeId')
   async calculateVacation(
     @Param('employeeId') employeeId: string,
     @Body('days') days?: number,
@@ -22,10 +53,19 @@ export class EosController {
     return this.eosService.calculateVacation(employeeId, days);
   }
 
-  @Get('aggregated') // /calculations/eos/aggregated
-  async getAggregatedCalculations(
-    @Query() query: AggregatedCalculationsQueryDto,
+  @Post('reactivate')
+  async reactivateEmployee(
+    @Body() body: { employeeId: string },
   ) {
-    return this.eosService.calculateAggregatedEntitlements(query);
+    return this.eosService.reactivateEmployee(body.employeeId);
+  }
+
+  // Parameterized route MUST be last
+  @Post(':employeeId')
+  async calculateEOS(
+    @Param('employeeId') employeeId: string,
+    @Body('terminationType') terminationType?: string,
+  ) {
+    return this.eosService.calculateEOS(employeeId, terminationType);
   }
 }
